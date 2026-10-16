@@ -58,7 +58,7 @@ export function Reader({ title }: { title: string }) {
     return () => { cancelled = true }
   }, [title])
 
-  const cards = useSuggestions(page?.summary.title ?? title, page?.lead ?? null, page?.nodeId ?? null)
+  const cards = useSuggestions(page?.summary.title ?? title, page?.summary.wikibase_item ?? null, page?.nodeId ?? null)
 
   const intro = useMemo(() => withCredits((full ?? page?.lead)?.lead ?? '', credits), [full, page, credits])
   const sections = useMemo(

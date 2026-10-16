@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { memoryStorage } from '../test/memoryStorage'
 import { API_USER_AGENT } from './http'
 import { fileNameFromUrl, getArticleHtml, getImageCredits, getLinkingBack, getMoreLike, getPageInfo, getSummary } from './wikipedia'
-import { getTypes } from './wikidata'
+import { getAnchors, getFacts } from './wikidata'
 
 vi.stubGlobal('localStorage', memoryStorage())
 // Node's default User-Agent is rejected (403) or throttled (429); browsers send their own.
@@ -23,6 +23,10 @@ it('talks to the real APIs', async () => {
   console.log('morelike', more.slice(0, 5))
   const back = await getLinkingBack([...more, 'Banana', 'Python (programming language)'], 'Hagia Sophia')
   console.log('link back', back.size, 'of', more.length + 2, back.has('Banana'))
-  const types = await getTypes(['Q142', 'Q2485', 'Q2728', 'Q12506'])
-  console.log('types', Object.fromEntries(types))
+  // Hagia Sophia (Q12506): architect Isidore of Miletus (Q353637), commissioned under Justinian I (Q41866).
+  const facts = await getFacts('Q12506', ['Q142', 'Q2485', 'Q353637', 'Q41866'], ['P84', 'P88'], ['P131'])
+  console.log('types', Object.fromEntries(facts.types), 'relations', Object.fromEntries(facts.relations))
+  expect(facts.types.get('Q142')).toContain('Q6256')
+  const anchors = await getAnchors(['Q12506', 'Q353637'], ['Q41176', 'Q42973'])
+  console.log('anchors', Object.fromEntries(anchors))
 }, 30_000)

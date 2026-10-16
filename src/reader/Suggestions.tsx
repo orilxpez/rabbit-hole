@@ -1,56 +1,24 @@
 import { useEffect, useState } from 'react'
-import { getPageInfo } from '../api/wikipedia'
-import curatedJson from '../data/curated.json'
-import { setSuggestionsShown, visitedTitles } from '../graph/history'
+import { suggest, type Card } from '../engine/suggest'
+import { setSuggestionsShown } from '../graph/history'
 import { articlePath, linkHandler } from '../router'
 import { getState, update } from '../state'
-import type { CleanArticle } from './cleanHtml'
 
-const curated: Record<string, string[]> = curatedJson
-const MAX_CARDS = 4
-
-export interface Card {
-  title: string
-  description: string | null
-  thumbnail: string | null
-  relation: string
-  sentence: string | null
-}
-
-/**
- * Phase 2 source (experiment E1): hand-curated suggestions, falling back to the
- * first links of the introduction. The phase 3 engine replaces the fallback.
- */
-export function useSuggestions(title: string, lead: CleanArticle | null, nodeId: string | null): Card[] | null {
+export function useSuggestions(title: string, qid: string | null, nodeId: string | null): Card[] | null {
   const [cards, setCards] = useState<Card[] | null>(null)
 
   useEffect(() => {
-    if (!lead || !nodeId) return
+    if (!nodeId) return
     let cancelled = false
-    const visited = visitedTitles(getState())
-    const pool = curated[title] ?? lead.links.filter((l) => l.section === 0).map((l) => l.title)
-    const candidates = pool.filter((t) => t !== title && !visited.has(t)).slice(0, MAX_CARDS * 2)
-    getPageInfo(candidates)
-      .then((info) => {
+    suggest({ title, qid, state: getState() })
+      .then(({ cards, source }) => {
         if (cancelled) return
-        const result: Card[] = []
-        for (const t of candidates) {
-          const i = info.get(t)
-          if (!i || i.disambiguation || visited.has(i.title) || result.length === MAX_CARDS) continue
-          result.push({
-            title: i.title,
-            description: i.description,
-            thumbnail: i.thumbnail,
-            relation: 'Relacionado',
-            sentence: lead.links.find((l) => l.title === t)?.sentence ?? null,
-          })
-        }
-        update((s) => setSuggestionsShown(s, nodeId, result.map((c) => c.title)))
-        setCards(result)
+        update((s) => setSuggestionsShown(s, nodeId, cards.map((c) => c.title), source))
+        setCards(cards)
       })
       .catch(() => !cancelled && setCards([]))
     return () => { cancelled = true }
-  }, [title, lead, nodeId])
+  }, [title, qid, nodeId])
 
   return cards
 }

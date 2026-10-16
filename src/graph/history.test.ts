@@ -25,7 +25,8 @@ describe('addVisit', () => {
 
   it('counts shown-but-not-chosen suggestions', () => {
     let s = addVisit(emptyState(), visit('a', 'A', 'seed'))
-    s = setSuggestionsShown(s, 'a', ['X', 'Y', 'Z'])
+    s = setSuggestionsShown(s, 'a', ['X', 'Y', 'Z'], 'engine')
+    expect(s.nodes.a.suggestionSource).toBe('engine')
     s = addVisit(s, visit('y', 'Y', 'suggestion'))
     expect(s.ignoredCounts).toEqual({ X: 1, Z: 1 })
   })

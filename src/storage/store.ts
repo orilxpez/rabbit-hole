@@ -20,6 +20,8 @@ export interface VisitNode {
   threadId: string
   chosenFrom: ChosenFrom
   suggestionsShown: string[]
+  /** Which recommender produced suggestionsShown (experiment E1 vs E3). */
+  suggestionSource: 'curated' | 'engine' | null
   chosen: string | null
 }
 

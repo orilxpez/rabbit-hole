@@ -25,6 +25,7 @@ export function addVisit(state: AppState, v: Visit): AppState {
     threadId,
     chosenFrom: parent ? v.chosenFrom : 'seed',
     suggestionsShown: [],
+    suggestionSource: null,
     chosen: null,
   }
   const nodes = { ...state.nodes, [node.id]: node }
@@ -43,10 +44,12 @@ export function setCurrent(state: AppState, nodeId: string): AppState {
   return state.nodes[nodeId] && state.currentNodeId !== nodeId ? { ...state, currentNodeId: nodeId } : state
 }
 
-export function setSuggestionsShown(state: AppState, nodeId: string, titles: string[]): AppState {
+export function setSuggestionsShown(
+  state: AppState, nodeId: string, titles: string[], source: VisitNode['suggestionSource'],
+): AppState {
   const node = state.nodes[nodeId]
   if (!node) return state
-  return { ...state, nodes: { ...state.nodes, [nodeId]: { ...node, suggestionsShown: titles } } }
+  return { ...state, nodes: { ...state.nodes, [nodeId]: { ...node, suggestionsShown: titles, suggestionSource: source } } }
 }
 
 export function visitedTitles(state: AppState): Set<string> {
