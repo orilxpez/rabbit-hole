@@ -19,10 +19,10 @@ Herramienta web de descubrimiento de conocimiento a partir de la Wikipedia en in
 
 ## Fuentes de datos (gratuitas, sin clave)
 
-- Wikipedia REST API (`en.wikipedia.org/api/rest_v1/`): resumen e HTML de artículos
-- MediaWiki Action API (`en.wikipedia.org/w/api.php`, siempre con `origin=*`): enlaces, búsqueda `morelike:`, `pageprops`
-- Wikidata (`wbgetentities`): tipo de entidad (P31) a partir del Q-id
-- Wikimedia Pageviews API: popularidad
+- Wikipedia REST API (`en.wikipedia.org/api/rest_v1/`): resumen de artículos. El HTML de RESTBase (`page/html`) está migrando a `w/rest.php/v1/page/{title}/html`.
+- MediaWiki Action API (`en.wikipedia.org/w/api.php`, siempre con `origin=*`): enlaces, búsqueda `morelike:`, `pageprops` y popularidad (`prop=pageviews`, por lotes de 50 títulos).
+- Wikidata Query Service (SPARQL, `query.wikidata.org/sparql`): tipo de entidad (P31) y relaciones. No usar `wbgetentities` con claims: pesa unos 8 MB por cada 20 entidades.
+- No usar la Pageviews REST API (`wikimedia.org/api/rest_v1/metrics/...`): su preflight CORS rechaza `Api-User-Agent` y pide una petición por título.
 
 Reglas obligatorias:
 - Enviar la cabecera `Api-User-Agent` identificando la app y un contacto.
