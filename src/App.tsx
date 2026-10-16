@@ -1,26 +1,24 @@
-import curated from './data/curated.json'
 import { Reader } from './reader/Reader'
-import { articlePath, linkHandler, titleFromPath, usePath } from './router'
+import { linkHandler, titleFromPath, usePath } from './router'
+import { Home } from './screens/Home'
+import { Onboarding } from './screens/Onboarding'
+import { useAppState } from './state'
 
 export function App() {
   const title = titleFromPath(usePath())
-  // key: every article starts with fresh reader state.
-  return title ? <Reader key={title} title={title} /> : <Home />
-}
-
-// Phase 2 placeholder: onboarding and the daily seed arrive in phase 4.
-function Home() {
-  return (
-    <main className="reader">
-      <h1>Rabbit Hole</h1>
-      <p className="muted">Elige por dónde empezar.</p>
-      <ul className="seed-list">
-        {Object.keys(curated).map((t) => (
-          <li key={t}>
-            <a href={articlePath(t)} onClick={linkHandler(articlePath(t), { from: 'seed' })}>{t}</a>
-          </li>
-        ))}
-      </ul>
-    </main>
-  )
+  const state = useAppState()
+  if (title) {
+    return (
+      <>
+        <nav className="topbar">
+          <a href="/" onClick={linkHandler('/', {})}>Rabbit Hole</a>
+          <a href="/" onClick={linkHandler('/', {})}>Nuevo hilo</a>
+        </nav>
+        {/* key: every article starts with fresh reader state. */}
+        <Reader key={title} title={title} />
+      </>
+    )
+  }
+  const firstVisit = !Object.keys(state.interests).length && !Object.keys(state.nodes).length
+  return firstVisit ? <Onboarding /> : <Home />
 }
