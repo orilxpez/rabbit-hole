@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { useEffect, useLayoutEffect } from 'react'
 import { endThread, pathTo } from './graph/history'
 import { useT } from './i18n'
+import { TrailRabbit } from './rabbit'
 import { Reader } from './reader/Reader'
 import { linkHandler, navigate, screenReady, titleFromPath, usePath } from './router'
 import { Debug } from './screens/Debug'
@@ -54,7 +55,7 @@ function Screen({ path, title }: { path: string; title: string | null }) {
 }
 
 const LANGS: Lang[] = ['en', 'es']
-const MAX_DOTS = 12
+const MAX_DOTS = 8 // keeps the trail inside a phone-width top bar
 
 function TopBar({ inReader = false }: { inReader?: boolean }) {
   const t = useT()
@@ -62,6 +63,7 @@ function TopBar({ inReader = false }: { inReader?: boolean }) {
   useEffect(() => { document.documentElement.lang = t.lang }, [t.lang])
 
   const path = pathTo(state, state.currentNodeId)
+  const shown = path.slice(-MAX_DOTS)
   const threadId = path[0]?.threadId
   const mapPath = threadId ? `/map?thread=${threadId}` : '/map'
 
@@ -74,13 +76,14 @@ function TopBar({ inReader = false }: { inReader?: boolean }) {
   return (
     <nav className="topbar">
       <a className="brand" href="/" onClick={linkHandler('/', {})}>{t('brand')}</a>
-      {inReader && path.length > 0 && (
-        // How deep the current thread goes: one dot per article read, the last one is "you are here".
-        <a className="depth" href={mapPath} onClick={linkHandler(mapPath, {})} aria-label={t('depth', { n: path.length })}>
-          {path.length > MAX_DOTS && <span className="depth-more">+{path.length - MAX_DOTS}</span>}
-          {path.slice(-MAX_DOTS).map((n) => <i key={n.id} className={n.id === state.currentNodeId ? 'here' : ''} />)}
-        </a>
-      )}
+      {/* The trail: the hole, one dot per article of the thread, and the rabbit sitting on
+          the one being read. With no open thread, the rabbit waits by the hole. */}
+      <a className="trail" href={mapPath} onClick={linkHandler(mapPath, {})}
+        aria-label={path.length ? t('depth', { n: path.length }) : t('map')}>
+        <b className="hole" />
+        {shown.map((n) => <i key={n.id} className={n.id === state.currentNodeId ? 'here' : ''} />)}
+        <TrailRabbit at={shown.length ? shown.findIndex((n) => n.id === state.currentNodeId) : 0} />
+      </a>
       <span className="topbar-end">
         <a href={mapPath} onClick={linkHandler(mapPath, {})}>{t('map')}</a>
         {inReader && threadId && <button type="button" className="stop" onClick={stop}>{t('stop')}</button>}

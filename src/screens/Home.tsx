@@ -5,7 +5,7 @@ import { useT } from '../i18n'
 import { articlePath, linkHandler } from '../router'
 import { SEEDS, dailySeed, otherSeeds } from '../seeds'
 import { useAppState } from '../state'
-import { Display, Hare, Thumb } from '../ui'
+import { Display, Thumb } from '../ui'
 
 const OTHER_SEEDS = 3
 
@@ -37,13 +37,7 @@ export function Home() {
 
   return (
     <main className="page home">
-      <div className="masthead">
-        <Display text="rabbit hole" className="wordmark" fit={6} />
-        <figure className="hare-block">
-          <Hare />
-          <figcaption className="credit">{t('hareCredit')}</figcaption>
-        </figure>
-      </div>
+      <Display text="rabbit hole" className="wordmark" fit={6} />
 
       {current && (
         <a className="button primary" href={articlePath(current.title)} onClick={linkHandler(articlePath(current.title), { nodeId: current.id })}>

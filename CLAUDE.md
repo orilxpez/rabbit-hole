@@ -45,7 +45,7 @@ Reglas obligatorias:
 - Página blanca y tinta negra pura. El marco clásico de las miniaturas de Wikipedia (`#F8F9FA`, borde `#C8CCD1`) es el elemento visual principal: imágenes, tarjetas y nodos del mapa. Las imágenes con transparencia siempre llevan fondo blanco.
 - Un único acento: amarillo rotulador `#F0E000`, solo para selección, "estás aquí" y la palabra enlazada.
 - Un solo elemento llamativo por pantalla: el título gigante en mayúsculas, justificado como un cartel (`<Display>` en `src/ui.tsx`). Etiquetas en minúscula, nunca en mayúsculas espaciadas.
-- Imagen de marca: la "Liebre joven" de Durero (1502, dominio público, Commons) como trama de puntos (`src/data/hare.txt`), siempre con su crédito.
+- Mascota: un conejo en pixel art (`src/rabbit.tsx`) que vive en la barra superior. Se sienta sobre el artículo actual del rastro (agujero y un punto por artículo), salta al bajar o volver atrás, y parpadea o mueve las orejas en reposo.
 - Movimiento: View Transitions nativas entre pantallas (la miniatura elegida se convierte en la imagen del artículo), el mapa se dibuja en orden de lectura, los otros caminos se despliegan. Siempre se respeta `prefers-reduced-motion`.
 
 ## Recorrido

@@ -63,11 +63,30 @@ img { background: #fff; } /* transparent diagrams always sit on white */
 .brand { font-weight: 600; }
 .topbar-end { display: flex; align-items: center; gap: 1.1rem; margin-left: auto; }
 
-/* Depth of the current thread: one dot per article. */
-.depth { gap: 4px; }
-.depth i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
-.depth i.here { background: var(--marker); box-shadow: 0 0 0 1px var(--ink); }
-.depth-more { margin-right: 2px; color: var(--graphite); font-size: 0.75rem; }
+/*
+  The trail: hole, then one dot per article (10px apart), and the pixel rabbit sitting
+  on the current one. --x is the rabbit's dot index; moving it is a hop.
+*/
+.topbar .trail { position: relative; gap: 5px; min-width: 40px; padding-right: 14px; }
+.hole { width: 14px; height: 5px; border-radius: 50%; background: var(--ink); }
+.trail i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); }
+.trail i.here { visibility: hidden; } /* the rabbit sits there instead */
+.rabbit-pos {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  transform: translateX(calc(9.5px + var(--x) * 10px));
+  transition: transform 420ms var(--ease-out);
+  pointer-events: none;
+}
+.rabbit { display: block; width: 24px; height: 24px; fill: var(--ink); shape-rendering: crispEdges; }
+.hopping .rabbit { animation: hop 420ms var(--ease-out); }
+@keyframes hop {
+  0% { transform: none; }
+  45% { transform: translateY(-10px) rotate(-8deg); }
+  100% { transform: none; }
+}
+.trail:hover .rabbit { fill: var(--ink); filter: drop-shadow(0 2px 0 var(--marker)); }
 
 .stop {
   display: inline-flex;
@@ -348,19 +367,6 @@ details[open] > summary::after { content: '\2212'; }
 .tile-desc { font-size: 0.8125rem; line-height: 1.3; color: var(--graphite); }
 
 /* ---------- Home ---------- */
-.masthead { display: grid; gap: 1rem; margin-top: 0.5rem; }
-.hare-block { margin: 0; max-width: 22rem; }
-.hare { display: block; width: 100%; height: auto; padding: 1.25rem; background: var(--marker); fill: var(--ink); }
-.hare g { animation: dots-in 320ms var(--ease-out) calc(var(--row) * 6ms) both; }
-@keyframes dots-in { from { opacity: 0; } to { opacity: 1; } }
-.hare-block figcaption { padding-top: 0.4rem; }
-@media (min-width: 900px) {
-  /* Wordmark across the page, the hare tucked under its right end. */
-  .masthead { grid-template-columns: minmax(0, 1fr) 20rem; }
-  .masthead .wordmark { grid-column: 1 / -1; margin-bottom: 0; }
-  .hare-block { grid-column: 2; }
-}
-
 .daily { max-width: 40rem; }
 .daily-card { display: flex; flex-direction: column; gap: 0.4rem; text-decoration: none; }
 .daily-thumb img { aspect-ratio: 16 / 10; }

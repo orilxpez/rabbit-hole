@@ -38,7 +38,6 @@ const en = {
   yourThreads: 'your threads',
   stopped: 'stopped',
   open: 'open',
-  hareCredit: 'Young Hare, Albrecht Dürer, 1502. Public domain, via Wikimedia Commons.',
 }
 
 type Key = keyof typeof en
@@ -76,7 +75,6 @@ const es: Record<Key, string> = {
   yourThreads: 'tus hilos',
   stopped: 'parado',
   open: 'abierto',
-  hareCredit: 'Liebre joven, Alberto Durero, 1502. Dominio público, vía Wikimedia Commons.',
 }
 
 // Relation labels come from engine/relations.ts in English.
