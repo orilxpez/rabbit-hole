@@ -1,6 +1,6 @@
 import type { ArticleLink } from '../reader/cleanHtml'
 import { EXCLUDED_TYPES } from '../api/wikidata'
-import { IGNORED_DECAY, POPULARITY, POSITION, WEIGHTS } from './weights'
+import { GENERIC, IGNORED_DECAY, POPULARITY, POSITION, WEIGHTS } from './weights'
 
 // Pure ranking functions. Every score is the sum of named parts so any suggestion
 // can be explained from Wikipedia/Wikidata data.
@@ -21,6 +21,10 @@ export interface Candidate {
   linksBack: boolean
   /** Times shown as a suggestion and not chosen. */
   ignoredCount: number
+  /** Wikidata class (has P279), as opposed to an individual thing, place or person. */
+  isClass: boolean
+  /** The current article is an instance or subclass of this candidate. */
+  isTypeOfCurrent: boolean
 }
 
 export interface ScoreParts {
@@ -31,6 +35,8 @@ export interface ScoreParts {
   affinity: number
   /** Multiplier from being ignored before (1 = never ignored). */
   decay: number
+  /** Multiplier for generic concepts (1 = specific). */
+  generic: number
 }
 
 export interface Scored {
@@ -97,6 +103,13 @@ export function affinityScore(tags: string[], interests: Record<string, number>)
   return Math.max(0, ...tags.map((t) => interests[t] ?? 0)) / max
 }
 
+export function genericMultiplier(c: Candidate): number {
+  let m = 1
+  if (c.isTypeOfCurrent) m *= GENERIC.typeOfCurrent
+  if (c.isClass && !c.inMoreLike) m *= GENERIC.unrelatedClass
+  return m
+}
+
 export function scoreCandidate(c: Candidate, ctx: RankContext): Scored {
   const parts: ScoreParts = {
     position: WEIGHTS.position * positionScore(c.link, ctx.sectionCount),
@@ -105,9 +118,10 @@ export function scoreCandidate(c: Candidate, ctx: RankContext): Scored {
     popularity: WEIGHTS.popularity * popularityScore(c.dailyViews),
     affinity: WEIGHTS.affinity * affinityScore(c.tags, ctx.interests),
     decay: IGNORED_DECAY ** c.ignoredCount,
+    generic: genericMultiplier(c),
   }
   const sum = parts.position + parts.reciprocity + parts.moreLike + parts.popularity + parts.affinity
-  return { candidate: c, score: sum * parts.decay, parts }
+  return { candidate: c, score: sum * parts.decay * parts.generic, parts }
 }
 
 /** Best first. */

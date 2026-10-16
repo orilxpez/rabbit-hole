@@ -32,6 +32,19 @@ export const POPULARITY = {
 /** Each time a suggestion is shown and not chosen, its future score is multiplied by this. */
 export const IGNORED_DECAY = 0.7
 
+/**
+ * Generic concepts are a dead end for a rabbit hole. Multipliers, from Wikidata:
+ * - typeOfCurrent: the candidate is what the current article *is* (its P31/P279),
+ *   e.g. "Manuscript" from "Rohonc Codex".
+ * - unrelatedClass: the candidate is a class (has P279) and morelike: does not find it
+ *   similar to this article, e.g. "Language" or "Liquid". Linking back is not enough
+ *   for a class: hub articles like "Liquid" link to almost everything.
+ */
+export const GENERIC = {
+  typeOfCurrent: 0.4,
+  unrelatedClass: 0.5,
+}
+
 /** Soft profile adjustment from reading signals. */
 export const READING = {
   /** Active reading time after which the article's interest tags get a nudge. */
@@ -45,7 +58,5 @@ export const LIMITS = {
   /** Article links considered (intro and "See also" first, then body in reading order). */
   linkCandidates: 50,
   moreLike: 20,
-  /** Reciprocity is only checked for the best N, to limit requests. */
-  reciprocityTopN: 15,
   suggestions: 4,
 }

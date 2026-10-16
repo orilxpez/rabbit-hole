@@ -20,6 +20,8 @@ const cand = (title: string, over: Partial<Candidate> = {}): Candidate => ({
   inMoreLike: false,
   linksBack: false,
   ignoredCount: 0,
+  isClass: false,
+  isTypeOfCurrent: false,
   ...over,
 })
 
@@ -94,6 +96,28 @@ describe('rank', () => {
       rank([{ ...strong, ignoredCount: ignored }, ...weaker], ctx).findIndex((s) => s.candidate.title === 'Strong')
     expect(top(0)).toBe(0)
     expect(top(4)).toBe(3)
+  })
+
+  it('pushes down the current article\'s own type (what it is, not where to go)', () => {
+    const ranked = rank([
+      cand('Manuscript', { link: link('Manuscript', 0), isTypeOfCurrent: true }),
+      cand('Voynich manuscript', { link: link('Voynich manuscript', 2), linksBack: true }),
+    ], ctx)
+    expect(ranked[0].candidate.title).toBe('Voynich manuscript')
+  })
+
+  it('pushes down generic classes with no sign of being specific to this article', () => {
+    const generic = cand('Language', { link: link('Language', 0), isClass: true })
+    const specificClass = cand('Muqarnas', { link: link('Muqarnas', 0), isClass: true, inMoreLike: true })
+    const body = cand('Hungarian runes', { link: link('Hungarian runes', 2) })
+    const order = rank([generic, specificClass, body], ctx).map((s) => s.candidate.title)
+    expect(order).toEqual(['Muqarnas', 'Hungarian runes', 'Language'])
+  })
+
+  it('does not trust a hub class just because it links back', () => {
+    const hub = cand('Liquid', { link: link('Liquid', 0), isClass: true, linksBack: true })
+    const specific = cand('Supercooling', { link: link('Supercooling', 1), isClass: true, linksBack: true, inMoreLike: true })
+    expect(rank([hub, specific], ctx)[0].candidate.title).toBe('Supercooling')
   })
 
   it('adds affinity for the reader interests', () => {

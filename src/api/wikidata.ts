@@ -38,11 +38,13 @@ export interface Facts {
   types: Map<string, string[]>
   /** Statements linking each item with `current`: current → item ("from"), item → current ("to") or a value both share. */
   relations: Map<string, { pid: string; dir: 'from' | 'to' | 'shared' }[]>
+  /** Items that are classes (have a P279 "subclass of"), not individual things. */
+  classes: Set<string>
 }
 
 /** Types and relations to the current article for many items, in one query (~0.5 s). */
 export async function getFacts(current: string | null, qids: string[], directPids: string[], sharedPids: string[]): Promise<Facts> {
-  const facts: Facts = { types: new Map(), relations: new Map() }
+  const facts: Facts = { types: new Map(), relations: new Map(), classes: new Set() }
   const items = values(qids)
   if (!items) return facts
   const wdt = (pids: string[]) => pids.map((p) => 'wdt:' + p).join(' ')
@@ -50,12 +52,14 @@ export async function getFacts(current: string | null, qids: string[], directPid
     UNION { VALUES ?p { ${wdt(directPids)} } ?item ?p wd:${current} . BIND("to" AS ?dir) }
     UNION { VALUES ?p { ${wdt(directPids)} } wd:${current} ?p ?item . BIND("from" AS ?dir) }
     UNION { VALUES ?p { ${wdt(sharedPids)} } wd:${current} ?p ?v . ?item ?p ?v . BIND("shared" AS ?dir) }` : ''
-  const res = await sparql(`SELECT DISTINCT ?item ?type ?p ?dir WHERE {
+  const res = await sparql(`SELECT DISTINCT ?item ?type ?p ?dir ?isClass WHERE {
     VALUES ?item { ${items} }
-    { ?item wdt:P31 ?type } ${relationPatterns}
+    { ?item wdt:P31 ?type }
+    UNION { ?item wdt:P279 [] . BIND(true AS ?isClass) } ${relationPatterns}
   }`)
   for (const b of res.results.bindings) {
     const item = qidOf(b.item.value)
+    if (b.isClass) facts.classes.add(item)
     if (b.type) push(facts.types, item, qidOf(b.type.value))
     if (b.p && b.dir) push(facts.relations, item, { pid: qidOf(b.p.value), dir: b.dir.value as 'from' | 'to' | 'shared' })
   }

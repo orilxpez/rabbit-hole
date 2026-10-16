@@ -15,7 +15,7 @@ const curated: Record<string, string[]> = curatedJson
 const ALL_ANCHORS = Object.values(INTERESTS).flatMap((i) => i.anchors)
 // The Wikidata Query Service is usually ~0.5 s but can take 5-10 s. The suggestions never
 // wait longer than these budgets; a late answer still lands in the cache for next time.
-const FACTS_BUDGET_MS = 1500
+const FACTS_BUDGET_MS = 2500 // includes waiting in the request queue behind the reciprocity checks
 const ANCHORS_BUDGET_MS = 700
 const withBudget = <T>(p: Promise<T>, ms: number, fallback: T) =>
   Promise.race([p.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
@@ -63,15 +63,14 @@ export async function suggest({ title, state }: Input): Promise<{ cards: Card[];
   const picked = preselectLinks(article.links, LIMITS.linkCandidates)
   const links = new Map(picked.map((l) => [l.title, l]))
   const titles = [...new Set([...links.keys(), ...moreLike])]
+  // Reciprocity for every candidate (2 batched requests), in parallel with the rest: it is the
+  // best evidence that a link is specific to this article and not a generic concept.
+  const back = getLinkingBack(titles, title).catch(() => new Set<string>())
   const { candidates, facts } = await enrich(titles, links, new Set(moreLike), state, qid, visited)
+  const linkingBack = await back
+  for (const c of candidates) c.linksBack = linkingBack.has(c.title)
 
-  const ctx = { sectionCount: article.sections.length, interests: state.interests }
-  let ranked = rank(candidates, ctx)
-  const top = ranked.slice(0, LIMITS.reciprocityTopN).map((s) => s.candidate)
-  const back = await getLinkingBack(top.map((c) => c.title), title).catch(() => new Set<string>())
-  for (const c of top) c.linksBack = back.has(c.title)
-  ranked = rank(candidates, ctx)
-
+  const ranked = rank(candidates, { sectionCount: article.sections.length, interests: state.interests })
   const chosen = selectDiverse(ranked, state.interests, LIMITS.suggestions)
   return { cards: chosen.map((s) => ({ ...toCard(s.candidate, facts), scored: s })), source: 'engine' }
 }
@@ -100,13 +99,15 @@ async function enrich(
       inMoreLike: moreLike.has(t),
       linksBack: false,
       ignoredCount: state.ignoredCounts[i.title] ?? 0,
+      isClass: false,
+      isTypeOfCurrent: false,
     }
     if (!isExcluded(c, visited)) candidates.push(c) // cheap filters first: fewer items for Wikidata
   }
 
   const qids = candidates.flatMap((c) => (c.qid ? [c.qid] : []))
   const hasProfile = Object.values(state.interests).some((v) => v > 0)
-  const empty: Facts = { types: new Map(), relations: new Map() }
+  const empty: Facts = { types: new Map(), relations: new Map(), classes: new Set() }
   // If Wikidata is down, titles and descriptions still filter years, dates, lists and countries.
   const none = new Map<string, string[]>()
   const [facts, anchors] = await Promise.all([
@@ -119,6 +120,8 @@ async function enrich(
     if (!c.qid) continue
     c.types = facts.types.get(c.qid) ?? []
     c.tags = [...new Set((anchors.get(c.qid) ?? []).flatMap((a) => TAGS_BY_ANCHOR.get(a) ?? []))]
+    c.isClass = facts.classes.has(c.qid)
+    c.isTypeOfCurrent = (facts.relations.get(c.qid) ?? []).some((r) => r.dir === 'from' && (r.pid === 'P31' || r.pid === 'P279'))
   }
   return { candidates: candidates.filter((c) => !isExcluded(c, visited)), facts }
 }
