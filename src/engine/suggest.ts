@@ -13,8 +13,12 @@ import { LIMITS } from './weights'
 
 const curated: Record<string, string[]> = curatedJson
 const ALL_ANCHORS = Object.values(INTERESTS).flatMap((i) => i.anchors)
+// The Wikidata Query Service is usually ~0.5 s but can take 5-10 s. The suggestions never
+// wait longer than these budgets; a late answer still lands in the cache for next time.
+const FACTS_BUDGET_MS = 1500
 const ANCHORS_BUDGET_MS = 700
-const wait = <T>(ms: number, value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
+const withBudget = <T>(p: Promise<T>, ms: number, fallback: T) =>
+  Promise.race([p.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
 
 export type SuggestionSource = 'curated' | 'engine'
 
@@ -106,10 +110,10 @@ async function enrich(
   // If Wikidata is down, titles and descriptions still filter years, dates, lists and countries.
   const none = new Map<string, string[]>()
   const [facts, anchors] = await Promise.all([
-    getFacts(qid, qids, DIRECT_PIDS, SHARED_PIDS).catch(() => empty),
-    // Interest tags take ~1.5 s on WDQS: wait a little, then rank without affinity.
-    // The query keeps running and lands in the cache for the next visit.
-    hasProfile ? Promise.race([getAnchors(qids, ALL_ANCHORS).catch(() => none), wait(ANCHORS_BUDGET_MS, none)]) : none,
+    // Without types, the title and description filters still drop years, dates, lists and countries.
+    withBudget(getFacts(qid, qids, DIRECT_PIDS, SHARED_PIDS), FACTS_BUDGET_MS, empty),
+    // Interest tags take ~1.5 s even on a good day: without them, ranking skips affinity.
+    hasProfile ? withBudget(getAnchors(qids, ALL_ANCHORS), ANCHORS_BUDGET_MS, none) : none,
   ])
   for (const c of candidates) {
     if (!c.qid) continue

@@ -31,6 +31,11 @@ describe('pickOnboarding', () => {
     const picks = pickOnboarding(seeds, (t) => t !== 'A1', 10)
     expect(picks.map((s) => s.title)).toEqual(['H1', 'A2', 'N1'])
   })
+
+  it('rotates which interests come first', () => {
+    // INTERESTS order: architecture, history, science, art, nature...; offset 3 starts at art.
+    expect(pickOnboarding(seeds, () => true, 2, 3).map((s) => s.title)).toEqual(['A1', 'N1'])
+  })
 })
 
 describe('otherSeeds', () => {

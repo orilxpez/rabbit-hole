@@ -4,7 +4,7 @@ import { missingRelationTranslations, relationText, translate } from './i18n'
 
 describe('i18n', () => {
   it('fills placeholders', () => {
-    expect(translate('en', 'pickMore', { n: 2 })).toBe('Pick 2 more')
+    expect(translate('en', 'otherPaths', { n: 2 })).toBe('Other paths (2)')
     expect(translate('es', 'continueWith', { title: 'Dome' })).toBe('Continuar con Dome')
   })
 

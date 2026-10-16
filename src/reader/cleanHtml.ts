@@ -39,6 +39,8 @@ const REMOVE = [
   '.vertical-navbox', '.sidebar', '.ambox', '.ombox', '.tmbox', '.mbox-small', '.metadata',
   '.noprint', '.mw-editsection', '.reference', '.reflist', '.mw-references-wrap', '.mw-empty-elt',
   '.portalbox', '.sistersitebox', '.side-box', '#coordinates', '.navigation-not-searchable',
+  // Parsing only the introduction leaves notes without their list, and MediaWiki prints a red warning.
+  '.mw-ext-cite-error', '.cite-error', '.error',
 ].join(',')
 
 const DROPPED_SECTIONS = /^(notes|references|citations|sources|bibliography|further reading|external links|footnotes|works cited|explanatory notes|general (and cited )?(sources|references))$/i
@@ -110,10 +112,21 @@ export function cleanArticle(html: string): CleanArticle {
   }
 }
 
-/** Appends "author · license" under every figure whose credit is known. */
-export function withCredits(html: string, credits: Map<string, { artist: string; license: string; descriptionUrl: string }>): string {
+/**
+ * Appends "author, license" under every figure whose credit is known, and drops the
+ * figure already shown as the hero image (Wikipedia's lead often repeats it).
+ */
+export function withCredits(
+  html: string,
+  credits: Map<string, { artist: string; license: string; descriptionUrl: string }>,
+  heroFile: string | null = null,
+): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   for (const fig of doc.querySelectorAll<HTMLElement>('figure[data-file]')) {
+    if (fig.dataset.file === heroFile) {
+      fig.remove()
+      continue
+    }
     const c = credits.get(fig.dataset.file!)
     if (!c) continue
     const credit = doc.createElement('a')
@@ -121,7 +134,7 @@ export function withCredits(html: string, credits: Map<string, { artist: string;
     credit.href = c.descriptionUrl
     credit.target = '_blank'
     credit.rel = 'noopener noreferrer'
-    credit.textContent = [c.artist, c.license].filter(Boolean).join(' · ')
+    credit.textContent = [c.artist, c.license].filter(Boolean).join(', ')
     fig.append(credit)
   }
   return doc.body.innerHTML

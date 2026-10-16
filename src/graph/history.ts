@@ -36,13 +36,37 @@ export function addVisit(state: AppState, v: Visit): AppState {
     ignoredCounts = { ...ignoredCounts }
     for (const t of parent.suggestionsShown) if (t !== v.title) ignoredCounts[t] = (ignoredCounts[t] ?? 0) + 1
   }
-  const threads = parent ? state.threads : { ...state.threads, [threadId]: { id: threadId, rootNodeId: node.id, createdAt: v.now } }
+  const threads = parent
+    ? state.threads
+    : { ...state.threads, [threadId]: { id: threadId, rootNodeId: node.id, createdAt: v.now, endedAt: null } }
   return { ...state, nodes, threads, ignoredCounts, currentNodeId: node.id }
 }
 
-/** Going back to an earlier node makes it current, so the next choice branches from it. */
+/**
+ * Going back to an earlier node makes it current, so the next choice branches from it.
+ * Returning to a node of a stopped thread reopens that thread.
+ */
 export function setCurrent(state: AppState, nodeId: string): AppState {
-  return state.nodes[nodeId] && state.currentNodeId !== nodeId ? { ...state, currentNodeId: nodeId } : state
+  const node = state.nodes[nodeId]
+  if (!node) return state
+  const thread = state.threads[node.threadId]
+  if (state.currentNodeId === nodeId && !thread?.endedAt) return state
+  const threads = thread?.endedAt ? { ...state.threads, [thread.id]: { ...thread, endedAt: null } } : state.threads
+  return { ...state, threads, currentNodeId: nodeId }
+}
+
+/** "Stop": closes the thread; the next article read starts a new one. */
+export function endThread(state: AppState, threadId: string, now: number): AppState {
+  const thread = state.threads[threadId]
+  if (!thread) return state
+  return { ...state, threads: { ...state.threads, [threadId]: { ...thread, endedAt: now } }, currentNodeId: null }
+}
+
+/** Nodes from the thread's root down to `nodeId`. */
+export function pathTo(state: AppState, nodeId: string | null): VisitNode[] {
+  const path: VisitNode[] = []
+  for (let n = nodeId ? state.nodes[nodeId] : undefined; n; n = n.parentId ? state.nodes[n.parentId] : undefined) path.unshift(n)
+  return path
 }
 
 export function setSuggestionsShown(

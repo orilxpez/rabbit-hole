@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyState } from '../storage/store'
-import { addVisit, nudgeInterests, recordSignal, setCurrent, setSuggestionsShown } from './history'
+import { addVisit, endThread, nudgeInterests, pathTo, recordSignal, setCurrent, setSuggestionsShown } from './history'
 
 describe('signals', () => {
   const signal = { nodeId: 'a', activeMs: 1, maxScrollDepth: 0.2, reachedSuggestions: false, openedFull: false, sectionsOpened: [] }
@@ -52,6 +52,18 @@ describe('addVisit', () => {
     s = addVisit(s, visit('c', 'C', 'link'))
     expect(s.nodes.c.parentId).toBe('a')
     expect(s.nodes.b.parentId).toBe('a')
+  })
+
+  it('stops a thread and reopens it when the reader goes back into it', () => {
+    let s = addVisit(emptyState(), visit('a', 'A', 'seed'))
+    s = addVisit(s, visit('b', 'B', 'link'))
+    s = endThread(s, 'a', 9)
+    expect(s.threads.a.endedAt).toBe(9)
+    expect(s.currentNodeId).toBeNull()
+    expect(addVisit(s, visit('c', 'C', 'link')).nodes.c.parentId).toBeNull() // after stopping, a new thread
+    s = setCurrent(s, 'b')
+    expect(s.threads.a.endedAt).toBeNull()
+    expect(pathTo(s, 'b').map((n) => n.title)).toEqual(['A', 'B'])
   })
 
   it('treats a first visit without context as a seed', () => {

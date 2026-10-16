@@ -41,11 +41,19 @@ Reglas obligatorias:
 ## Diseño
 
 - Tema claro único, sin modo oscuro. Tokens en `:root` de `src/styles.css`.
-- Fuentes de Fontshare: Switzer (interfaz y titulares grotesk gigantes en mayúsculas) y Sentient (lectura).
-- Papel gris `#EDEDEA`, tinta negra pura, imágenes sobre blanco con marco al estilo clásico de Wikipedia. Las imágenes con transparencia siempre llevan fondo blanco.
-- Un único acento: amarillo rotulador `#F0E000`, solo para selección, estados activos y la palabra enlazada en las tarjetas.
-- Un solo elemento llamativo por pantalla (el título gigante); el resto, sobrio. Etiquetas en minúscula, nunca en mayúsculas espaciadas.
+- Fuentes de Fontshare: Switzer (interfaz y titulares) y Sentient (lectura).
+- Página blanca y tinta negra pura. El marco clásico de las miniaturas de Wikipedia (`#F8F9FA`, borde `#C8CCD1`) es el elemento visual principal: imágenes, tarjetas y nodos del mapa. Las imágenes con transparencia siempre llevan fondo blanco.
+- Un único acento: amarillo rotulador `#F0E000`, solo para selección, "estás aquí" y la palabra enlazada.
+- Un solo elemento llamativo por pantalla: el título gigante en mayúsculas, justificado como un cartel (`<Display>` en `src/ui.tsx`). Etiquetas en minúscula, nunca en mayúsculas espaciadas.
+- Imagen de marca: la "Liebre joven" de Durero (1502, dominio público, Commons) como trama de puntos (`src/data/hare.txt`), siempre con su crédito.
+- Movimiento: View Transitions nativas entre pantallas (la miniatura elegida se convierte en la imagen del artículo), el mapa se dibuja en orden de lectura, los otros caminos se despliegan. Siempre se respeta `prefers-reduced-motion`.
+
+## Recorrido
+
+- Onboarding: una semilla entre 6 (una por interés, rotando cada día). Con un toque empieza el hilo.
+- Tras leer, una sola salida ("down the hole") con la mejor sugerencia; las alternativas, plegadas en "otros caminos". Solo cuenta como mostrado lo que el lector ha visto.
+- "Stop" cierra el hilo y lleva al mapa (`/map`). Volver a un nodo del mapa reabre el hilo desde ahí.
 
 ## Fuera de alcance del MVP
 
-Búsqueda, LLM, login/cuentas, pestaña de mapa, bifurcaciones, animaciones, exportar mapa, monetización. Traducción de artículos al español: pendiente (propuesta: Microsoft Translator detrás de una función de Vercel). El modelo de datos sí debe estar preparado para mapa y bifurcaciones.
+Búsqueda, LLM, login/cuentas, exportar mapa, monetización. Traducción de artículos al español: pendiente (propuesta: Microsoft Translator detrás de una función de Vercel). El modelo de datos sí debe estar preparado para mapa y bifurcaciones.

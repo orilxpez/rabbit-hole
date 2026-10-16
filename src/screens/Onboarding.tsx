@@ -1,62 +1,51 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { getPageInfo, type PageInfo } from '../api/wikipedia'
 import { useT } from '../i18n'
 import { articlePath, navigate } from '../router'
-import { SEEDS, pickOnboarding, type Seed } from '../seeds'
+import { SEEDS, dayNumber, pickOnboarding, type Seed } from '../seeds'
 import { update } from '../state'
+import { Display, Thumb } from '../ui'
 
-const GRID_SIZE = 10
-const MIN_PICKS = 3
+const CHOICES = 6
 
+/** One tap configures the profile and starts the descent: no multi-select, no confirm step. */
 export function Onboarding() {
   const t = useT()
   const [info, setInfo] = useState<Map<string, PageInfo> | null>(null)
-  const [selected, setSelected] = useState<Seed[]>([])
 
   useEffect(() => {
     getPageInfo(SEEDS.map((s) => s.title)).then(setInfo).catch(() => setInfo(new Map()))
   }, [])
 
   // Offline or API down: show the seeds without images rather than nothing.
-  const picks = info ? pickOnboarding(SEEDS, (title) => !info.size || !!info.get(title)?.thumbnail, GRID_SIZE) : []
-  const toggle = (s: Seed) =>
-    setSelected((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]))
+  const hasImage = (title: string) => !info?.size || !!info.get(title)?.thumbnail
+  const picks = pickOnboarding(SEEDS, hasImage, CHOICES, dayNumber(new Date()))
 
-  function start() {
-    update((st) => ({ ...st, interests: Object.fromEntries(selected.map((s) => [s.tag, 1])) }))
-    navigate(articlePath(selected[0].title), { from: 'seed' })
+  function start(seed: Seed, img: HTMLElement | null) {
+    update((st) => ({ ...st, interests: { [seed.tag]: 1 } }))
+    // The chosen image becomes the article's hero image during the transition.
+    img?.style.setProperty('view-transition-name', 'hero')
+    navigate(articlePath(seed.title), { from: 'seed' })
   }
 
-  const missing = MIN_PICKS - selected.length
   return (
     <main className="page">
-      <h1 className="display">{t('onboardTitle')}</h1>
-      <p className="lede">{t('onboardHint')}</p>
-      {!info && <p className="sr-only">{t('loading')}</p>}
-      <ul className="seed-grid">
-        {(info ? picks : SEEDS.slice(0, GRID_SIZE)).map((s) => {
-          const i = info?.get(s.title)
-          const order = selected.indexOf(s)
+      <Display text={t('pickTitle')} />
+      <p className="lede">{t('pickHint')}</p>
+      <ul className="seed-grid" aria-busy={!info}>
+        {picks.map((s, i) => {
+          const p = info?.get(s.title)
           return (
-            <li key={s.title}>
-              <button type="button" className="tile" aria-pressed={order >= 0} onClick={() => toggle(s)}>
-                <span className="tile-head">
-                  <strong>{s.title}</strong>
-                  {/* The first pick is where reading starts, so the order matters and is shown. */}
-                  {order >= 0 && <span className="tile-order">{order + 1}</span>}
-                </span>
-                <span className="tile-media">{i?.thumbnail && <img src={i.thumbnail} alt="" />}</span>
-                {i?.description && <span className="tile-desc">{i.description}</span>}
+            <li key={s.title} style={{ '--i': i } as CSSProperties}>
+              <button type="button" className="tile" onClick={(e) => start(s, e.currentTarget.querySelector('img'))}>
+                <Thumb src={p?.thumbnail} className="tile-thumb" />
+                <strong>{s.title}</strong>
+                {p?.description && <span className="tile-desc">{p.description}</span>}
               </button>
             </li>
           )
         })}
       </ul>
-      <div className="dock">
-        <button className="button primary" disabled={missing > 0} onClick={start}>
-          {missing > 0 ? t('pickMore', { n: missing }) : t('startReading')}
-        </button>
-      </div>
     </main>
   )
 }

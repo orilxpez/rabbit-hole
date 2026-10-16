@@ -19,10 +19,12 @@ export function dailySeed(seeds: Seed[], date: Date): Seed {
   return seeds[dayNumber(date) % seeds.length]
 }
 
-/** One seed per interest (the first with an image), in INTERESTS order, up to n. */
-export function pickOnboarding(seeds: Seed[], hasImage: (title: string) => boolean, n: number): Seed[] {
+/** One seed per interest (the first with an image), up to n; `offset` rotates which interests come first. */
+export function pickOnboarding(seeds: Seed[], hasImage: (title: string) => boolean, n: number, offset = 0): Seed[] {
+  const tags = Object.keys(INTERESTS)
+  const start = offset % tags.length
   const picks: Seed[] = []
-  for (const tag of Object.keys(INTERESTS)) {
+  for (const tag of [...tags.slice(start), ...tags.slice(0, start)]) {
     const seed = seeds.find((s) => s.tag === tag && hasImage(s.title))
     if (seed) picks.push(seed)
   }

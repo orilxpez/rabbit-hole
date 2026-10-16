@@ -1,7 +1,7 @@
 // The only module that touches localStorage. App state is a single versioned
 // document; API cache entries live under their own prefix and are disposable.
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 const STATE_KEY = 'rh:state'
 const CACHE_PREFIX = 'rh:cache:'
 const MAX_SIGNALS = 500
@@ -29,6 +29,8 @@ export interface Thread {
   id: string
   rootNodeId: string
   createdAt: number
+  /** Set when the reader stops the thread; reopening a node of it clears it. */
+  endedAt: number | null
 }
 
 export interface ReadingSignal {
@@ -71,6 +73,11 @@ export function emptyState(): AppState {
 // migrations[n] upgrades a version-n document to version n+1.
 const migrations: Record<number, (old: any) => any> = {
   1: (old) => ({ ...old, version: 2, lang: 'en' }), // v2: interface language
+  2: (old) => ({ // v3: threads can be stopped
+    ...old,
+    version: 3,
+    threads: Object.fromEntries(Object.entries(old.threads).map(([id, t]: [string, any]) => [id, { ...t, endedAt: null }])),
+  }),
 }
 
 export function migrate(raw: any): AppState {

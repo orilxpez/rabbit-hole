@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type CSSProperties, type MouseEvent } from 'react'
 import { getArticleHtml, getSummary } from '../api/wikipedia'
 import { suggest, type Card, type SuggestionSource } from '../engine/suggest'
 import { setSuggestionsShown } from '../graph/history'
 import { useT } from '../i18n'
-import { articlePath, linkHandler } from '../router'
+import { articlePath, navigate } from '../router'
 import { getState, update } from '../state'
+import { Thumb } from '../ui'
 import { excerpt, type Quote } from './cleanHtml'
 
 const PREFETCH_DELAY_MS = 1500
 
 /**
- * Starts as soon as the article opens (not after it renders) and, once the cards
- * are known, preloads their introductions so following one feels instant.
+ * Starts as soon as the article opens. The best candidate is "the next step down";
+ * the rest stay folded as other paths. Only what the reader actually sees counts as
+ * shown, so folded alternatives are not penalised as ignored.
  */
-export function useSuggestions(title: string, nodeId: string | null): Card[] | null {
+export function useSuggestions(title: string, nodeId: string | null) {
   const [result, setResult] = useState<{ cards: Card[]; source: SuggestionSource } | null>(null)
+  const [revealed, setRevealed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -26,8 +29,13 @@ export function useSuggestions(title: string, nodeId: string | null): Card[] | n
 
   useEffect(() => {
     if (!result || !nodeId) return
-    update((s) => setSuggestionsShown(s, nodeId, result.cards.map((c) => c.title), result.source))
-    // Low priority: wait so the prefetch never competes with what the reader is loading.
+    const shown = revealed ? result.cards : result.cards.slice(0, 1)
+    update((s) => setSuggestionsShown(s, nodeId, shown.map((c) => c.title), result.source))
+  }, [result, nodeId, revealed])
+
+  // Preload the next step (and the alternatives) so following one is instant.
+  useEffect(() => {
+    if (!result) return
     const timer = setTimeout(() => {
       for (const c of result.cards) {
         getSummary(c.title).catch(() => {})
@@ -35,46 +43,85 @@ export function useSuggestions(title: string, nodeId: string | null): Card[] | n
       }
     }, PREFETCH_DELAY_MS)
     return () => clearTimeout(timer)
-  }, [result, nodeId])
+  }, [result])
 
-  return result?.cards ?? null
+  return { cards: result?.cards ?? null, revealed, reveal: () => setRevealed(true) }
 }
 
 /** The sentence where the link appears, with the linked words marked: the reason for the suggestion. */
 function Excerpt({ quote }: { quote: Quote }) {
   const { before, link, after } = excerpt(quote)
-  return <q className="card-quote">{before}<mark>{link}</mark>{after}</q>
+  return <q className="excerpt">{before}<mark>{link}</mark>{after}</q>
 }
 
-export function SuggestionList({ cards }: { cards: Card[] | null }) {
+// Follows a suggestion; its thumbnail becomes the next article's hero image.
+function follow(title: string, e: MouseEvent<HTMLAnchorElement>) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+  e.preventDefault()
+  document.querySelectorAll<HTMLElement>('.hero img').forEach((img) => img.style.setProperty('view-transition-name', 'none'))
+  e.currentTarget.querySelector<HTMLElement>('.thumb img')?.style.setProperty('view-transition-name', 'hero')
+  navigate(articlePath(title), { from: 'suggestion' })
+}
+
+interface Props {
+  cards: Card[] | null
+  revealed: boolean
+  onReveal: () => void
+}
+
+export function NextPath({ cards, revealed, onReveal }: Props) {
   const t = useT()
+  const [open, setOpen] = useState(false)
+  const listId = useId()
   if (cards && !cards.length) return null
+  const [next, ...others] = cards ?? []
+
   return (
-    <section className="suggestions" aria-label={t('keepGoing')} aria-busy={!cards}>
-      <h2 className="label">{t('keepGoing')}</h2>
-      {!cards ? (
-        <>
-          <p className="sr-only">{t('findingNext')}</p>
-          <ul className="cards" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => <li key={i} className="card skeleton" />)}
-          </ul>
-        </>
+    <section className="next" aria-label={t('downTheHole')} aria-busy={!cards}>
+      <h2 className="label">{t('downTheHole')}</h2>
+      {!next ? (
+        <div className="next-card skeleton" aria-hidden="true"><p className="sr-only">{t('findingNext')}</p></div>
       ) : (
-        <ul className="cards">
-          {cards.map((c) => (
-            <li key={c.title}>
-              <a className="card" href={articlePath(c.title)} onClick={linkHandler(articlePath(c.title), { from: 'suggestion' })}>
-                <span className="card-head">
-                  <strong>{c.title}</strong>
-                  {c.description && <span className="card-desc">{c.description}</span>}
-                </span>
-                {c.thumbnail && <span className="card-media"><img src={c.thumbnail} alt="" loading="lazy" /></span>}
-                {c.sentence && <Excerpt quote={c.sentence} />}
-                <span className="pill">{t.relation(c.relation)}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <a className="next-card" href={articlePath(next.title)} onClick={(e) => follow(next.title, e)}>
+          <Thumb src={next.thumbnail} className="next-thumb" />
+          <span className="next-body">
+            <span className="pill">{t.relation(next.relation)}</span>
+            <strong className="next-title">{next.title}</strong>
+            {next.description && <span className="next-desc">{next.description}</span>}
+            {next.sentence && <Excerpt quote={next.sentence} />}
+            <span className="button primary next-go">{t('goDeeper')}</span>
+          </span>
+        </a>
+      )}
+
+      {others.length > 0 && (
+        <div className="paths" data-open={open}>
+          <button
+            type="button"
+            className="paths-toggle"
+            aria-expanded={open}
+            aria-controls={listId}
+            onClick={() => { setOpen(!open); if (!revealed) onReveal() }}
+          >
+            {open ? t('hidePaths') : t('otherPaths', { n: others.length })}
+          </button>
+          <div className="paths-panel" id={listId} inert={!open}>
+            <ul className="paths-list">
+              {others.map((c, i) => (
+                <li key={c.title} style={{ '--i': i } as CSSProperties}>
+                  <a className="path" href={articlePath(c.title)} onClick={(e) => follow(c.title, e)}>
+                    <Thumb src={c.thumbnail} className="path-thumb" />
+                    <span className="path-body">
+                      <strong>{c.title}</strong>
+                      {c.sentence ? <Excerpt quote={c.sentence} /> : c.description && <span className="next-desc">{c.description}</span>}
+                    </span>
+                    <span className="pill">{t.relation(c.relation)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
     </section>
   )

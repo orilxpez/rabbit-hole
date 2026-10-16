@@ -77,6 +77,20 @@ describe('cleanArticle', () => {
     expect(a.links[4]).toMatchObject({ sectionTitle: 'See also', sentence: null })
   })
 
+  it('drops the figure already shown as hero and credits the rest', async () => {
+    const { withCredits } = await import('./cleanHtml')
+    const html = '<figure data-file="Hero.jpg"><img></figure><figure data-file="Other.jpg"><img></figure>'
+    const credits = new Map([['Other.jpg', { artist: 'Ann', license: 'CC0', descriptionUrl: 'u' }]])
+    const out = withCredits(html, credits, 'Hero.jpg')
+    expect(out).not.toContain('Hero.jpg')
+    expect(out).toContain('>Ann, CC0</a>')
+  })
+
+  it('drops MediaWiki cite warnings left by parsing only the introduction', () => {
+    const lead = cleanArticle('<div class="mw-parser-output"><p>Text</p><div class="mw-references-wrap"></div><span class="error mw-ext-cite-error">Cite error: {{reflist}} template</span></div>')
+    expect(lead.lead).toBe('<p>Text</p>')
+  })
+
   it('strips script handlers and javascript: URLs', () => {
     const dirty = cleanArticle('<div class="mw-parser-output"><p onclick="x()">Hi <a href="javascript:alert(1)">y</a></p><iframe src="z"></iframe></div>')
     expect(dirty.lead).toBe('<p>Hi y</p>')

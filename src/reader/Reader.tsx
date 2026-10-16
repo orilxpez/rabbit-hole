@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   fileNameFromUrl, getArticleHtml, getImageCredits, getSummary, type ImageCredit, type Summary,
 } from '../api/wikipedia'
 import { addVisit, setCurrent } from '../graph/history'
-import { articlePath, linkHandler, markVisitRecorded, navState } from '../router'
+import { articlePath, linkHandler, markVisitRecorded, navState, screenReady } from '../router'
 import { useT } from '../i18n'
 import { getState, update } from '../state'
 import { cleanArticle, withCredits, type CleanArticle } from './cleanHtml'
-import { SuggestionList, useSuggestions } from './Suggestions'
+import { NextPath, useSuggestions } from './Suggestions'
+import { Display } from '../ui'
 import { useReadingSignals } from './useReadingSignals'
 
 const LICENSE_URL = 'https://creativecommons.org/licenses/by-sa/4.0/'
@@ -60,12 +61,19 @@ export function Reader({ title }: { title: string }) {
     return () => { cancelled = true }
   }, [title])
 
+  // The transition from the previous screen waits for this frame, so the hero can morph.
+  useLayoutEffect(() => { if (page || error) screenReady() }, [page, error])
+
   const t = useT()
-  const cards = useSuggestions(title, page?.nodeId ?? null)
+  const { cards, revealed, reveal } = useSuggestions(title, page?.nodeId ?? null)
   const articleRef = useRef<HTMLElement>(null)
   const signals = useReadingSignals(page?.nodeId ?? null, page?.summary.wikibase_item ?? null, articleRef)
 
-  const intro = useMemo(() => withCredits((full ?? page?.lead)?.lead ?? '', credits), [full, page, credits])
+  const heroFile = page?.summary.originalimage ? fileNameFromUrl(page.summary.originalimage.source) : null
+  const intro = useMemo(
+    () => withCredits((full ?? page?.lead)?.lead ?? '', credits, heroFile),
+    [full, page, credits, heroFile],
+  )
   const sections = useMemo(
     () => full?.sections.map((s) => ({ ...s, html: withCredits(s.html, credits) })) ?? [],
     [full, credits],
@@ -100,7 +108,7 @@ export function Reader({ title }: { title: string }) {
       {/* The title is known from the URL, so the page has its headline before any request returns. */}
       <article ref={articleRef} lang="en">
         <header className="article-head">
-          <h1 className="display">{summary?.title ?? title}</h1>
+          <Display text={summary?.title ?? title} />
           <p className="article-desc">{summary?.description ?? ' '}</p>
         </header>
 
@@ -109,7 +117,9 @@ export function Reader({ title }: { title: string }) {
 
         {hero && (
           <figure className="frame hero">
-            <img src={hero} alt="" />
+            {/* The small thumbnail is already cached (it was the card image), so it shows at
+                once behind the large one while that loads. */}
+            <img src={hero} alt="" style={summary.thumbnail ? { backgroundImage: `url("${summary.thumbnail.source}")` } : undefined} />
             {heroCredit && (
               <figcaption>
                 <a className="credit" href={heroCredit.descriptionUrl} target="_blank" rel="noopener noreferrer">
@@ -121,8 +131,6 @@ export function Reader({ title }: { title: string }) {
         )}
         {page && <div className="prose" onClick={onTextClick} dangerouslySetInnerHTML={{ __html: intro }} />}
 
-        <SuggestionList cards={cards} />
-
         {page && !full && (
           <button className="button" onClick={openFull} disabled={loadingFull}>
             {loadingFull ? t('loading') : t('readFull')}
@@ -130,18 +138,18 @@ export function Reader({ title }: { title: string }) {
         )}
         {error && page && <p className="error">{t(error)}</p>}
         {full && (
-          <>
-            <div className="prose sections" onClick={onTextClick}>
-              {sections.map((s) => (
-                <details key={s.id || s.title} onToggle={(e) => e.currentTarget.open && signals.openedSection(s.title)}>
-                  <summary>{s.title}</summary>
-                  <div dangerouslySetInnerHTML={{ __html: s.html }} />
-                </details>
-              ))}
-            </div>
-            <SuggestionList cards={cards} />
-          </>
+          <div className="prose sections" onClick={onTextClick}>
+            {sections.map((s) => (
+              <details key={s.id || s.title} onToggle={(e) => e.currentTarget.open && signals.openedSection(s.title)}>
+                <summary>{s.title}</summary>
+                <div dangerouslySetInnerHTML={{ __html: s.html }} />
+              </details>
+            ))}
+          </div>
         )}
+
+        {/* One way down, after whatever the reader chose to read. */}
+        <NextPath cards={cards} revealed={revealed} onReveal={reveal} />
 
         {summary && (
           <footer className="attribution">

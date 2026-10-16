@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPageInfo, type PageInfo } from '../api/wikipedia'
-import { visitedTitles } from '../graph/history'
+import { pathTo, visitedTitles } from '../graph/history'
 import { useT } from '../i18n'
 import { articlePath, linkHandler } from '../router'
 import { SEEDS, dailySeed, otherSeeds } from '../seeds'
 import { useAppState } from '../state'
+import { Display, Hare, Thumb } from '../ui'
 
 const OTHER_SEEDS = 3
 
@@ -13,17 +14,19 @@ export function Home() {
   const state = useAppState()
   const [info, setInfo] = useState<Map<string, PageInfo>>(new Map())
 
-  const { daily, rest, last } = useMemo(() => {
+  const { daily, rest } = useMemo(() => {
     const today = new Date()
-    const nodes = Object.values(state.nodes)
     const daily = dailySeed(SEEDS, today)
     return {
       daily,
       rest: otherSeeds(SEEDS, state.interests, visitedTitles(state), today, OTHER_SEEDS + 1)
         .filter((s) => s.title !== daily.title).slice(0, OTHER_SEEDS),
-      last: nodes.length ? nodes.reduce((a, b) => (b.visitedAt > a.visitedAt ? b : a)) : null,
     }
   }, [state])
+  // Continue only an open thread; a stopped one lives on in the map.
+  const current = state.currentNodeId ? state.nodes[state.currentNodeId] : null
+  const depth = pathTo(state, state.currentNodeId).length
+  const hasThreads = Object.keys(state.threads).length > 0
 
   const titlesKey = [daily.title, ...rest.map((s) => s.title)].join('|')
   useEffect(() => {
@@ -31,22 +34,27 @@ export function Home() {
   }, [titlesKey])
 
   const d = info.get(daily.title)
-  const threads = Object.keys(state.threads).length
 
   return (
-    <main className="page">
-      <h1 className="display wordmark">rabbit hole</h1>
+    <main className="page home">
+      <div className="masthead">
+        <Display text="rabbit hole" className="wordmark" fit={6} />
+        <figure className="hare-block">
+          <Hare />
+          <figcaption className="credit">{t('hareCredit')}</figcaption>
+        </figure>
+      </div>
 
-      {last && (
-        <a className="button primary" href={articlePath(last.title)} onClick={linkHandler(articlePath(last.title), { nodeId: last.id })}>
-          {t('continueWith', { title: last.title })}
+      {current && (
+        <a className="button primary" href={articlePath(current.title)} onClick={linkHandler(articlePath(current.title), { nodeId: current.id })}>
+          {t('continueWith', { title: current.title })} <span className="button-meta">{t('depth', { n: depth })}</span>
         </a>
       )}
 
       <section className="daily">
         <h2 className="label">{t('todaysSeed')}</h2>
         <a className="daily-card" href={articlePath(daily.title)} onClick={linkHandler(articlePath(daily.title), { from: 'seed' })}>
-          <span className="frame">{d?.thumbnail && <img src={d.thumbnail} alt="" />}</span>
+          <Thumb src={d?.thumbnail} className="daily-thumb" />
           <strong className="daily-title">{daily.title}</strong>
           {d?.description && <span className="article-desc">{d.description}</span>}
         </a>
@@ -68,7 +76,7 @@ export function Home() {
         </section>
       )}
 
-      {threads > 0 && <p className="footnote">{threads === 1 ? t('threadsOne') : t('threadsMany', { n: threads })}</p>}
+      {hasThreads && <a className="button" href="/map" onClick={linkHandler('/map', {})}>{t('seeMap')}</a>}
     </main>
   )
 }

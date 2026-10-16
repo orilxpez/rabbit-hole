@@ -30,7 +30,10 @@ describe('state', () => {
   it('migrates v1 documents, keeping the history', () => {
     const v1 = { ...emptyState(), version: 1, interests: { art: 1 } } as any
     delete v1.lang
-    expect(migrate(v1)).toMatchObject({ version: 2, lang: 'en', interests: { art: 1 } })
+    v1.threads = { t: { id: 't', rootNodeId: 'n', createdAt: 1 } }
+    expect(migrate(v1)).toMatchObject({
+      version: 3, lang: 'en', interests: { art: 1 }, threads: { t: { id: 't', endedAt: null } },
+    })
   })
 
   it('rejects documents from a newer schema instead of guessing', () => {
