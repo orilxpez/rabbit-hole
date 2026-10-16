@@ -53,7 +53,11 @@ h1 {
 .hero .credit { padding: 0 1rem; }
 
 /* Wikipedia text */
+.prose { overflow-wrap: break-word; }
 .prose p { margin: 0 0 1em; }
+.prose pre { overflow-x: auto; }
+.prose .gallery { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; list-style: none; }
+.prose .gallery li { max-width: 100%; }
 .prose a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .prose img { max-width: 100%; height: auto; }
 .prose figure { margin: 1.25rem 0; }
@@ -111,7 +115,14 @@ summary {
 .card img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex: none; }
 .card-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .card strong { font-size: 1.05rem; }
-.card q { font: italic 0.9rem/1.45 var(--serif); color: var(--muted); }
+.card q {
+  font: italic 0.9rem/1.45 var(--serif);
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .tag { font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); }
 
 .attribution { margin-top: 3rem; font: 0.8rem/1.5 var(--sans); color: var(--muted); }
@@ -125,10 +136,10 @@ summary {
   justify-content: space-between;
   max-width: 38rem;
   margin: 0 auto;
-  padding: 0.75rem 1rem 0;
+  padding: 0 1rem;
   font: 0.85rem var(--sans);
 }
-.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); text-decoration: none; }
 .topbar a:first-child { font-weight: 600; color: var(--text); }
 
 .eyebrow { font: 0.8rem var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 2rem 0 0.75rem; }
@@ -175,7 +186,12 @@ a.read-more { text-align: center; text-decoration: none; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.read-more.primary:not(:disabled) { position: sticky; bottom: 1rem; }
+.read-more.primary:not(:disabled) { position: sticky; bottom: calc(1rem + env(safe-area-inset-bottom)); }
+
+.debug { width: 100%; border-collapse: collapse; font: 0.9rem/1.4 var(--sans); margin: 1rem 0; }
+.debug th, .debug td { padding: 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.debug th { text-align: left; font-weight: normal; color: var(--muted); padding-right: 1rem; }
+.debug td { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Home */
 .daily-card {

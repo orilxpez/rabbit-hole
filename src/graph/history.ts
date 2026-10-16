@@ -1,4 +1,5 @@
-import type { AppState, ChosenFrom, VisitNode } from '../storage/store'
+import { READING } from '../engine/weights'
+import type { AppState, ChosenFrom, ReadingSignal, VisitNode } from '../storage/store'
 
 interface Visit {
   id: string
@@ -50,6 +51,18 @@ export function setSuggestionsShown(
   const node = state.nodes[nodeId]
   if (!node) return state
   return { ...state, nodes: { ...state.nodes, [nodeId]: { ...node, suggestionsShown: titles, suggestionSource: source } } }
+}
+
+/** One signal per node: a revisit updates the same entry. */
+export function recordSignal(state: AppState, signal: ReadingSignal): AppState {
+  return { ...state, signals: [...state.signals.filter((s) => s.nodeId !== signal.nodeId), signal] }
+}
+
+/** Small, capped bump for the interest tags of an article the reader actually read. */
+export function nudgeInterests(interests: Record<string, number>, tags: string[]): Record<string, number> {
+  const next = { ...interests }
+  for (const t of tags) next[t] = Math.min(READING.maxInterest, (next[t] ?? 0) + READING.nudge)
+  return next
 }
 
 export function visitedTitles(state: AppState): Set<string> {

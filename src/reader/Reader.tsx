@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   fileNameFromUrl, getArticleHtml, getImageCredits, getSummary, type ImageCredit, type Summary,
 } from '../api/wikipedia'
@@ -7,6 +7,7 @@ import { articlePath, linkHandler, markVisitRecorded, navState } from '../router
 import { getState, update } from '../state'
 import { cleanArticle, withCredits, type CleanArticle } from './cleanHtml'
 import { SuggestionList, useSuggestions } from './Suggestions'
+import { useReadingSignals } from './useReadingSignals'
 
 const LICENSE_URL = 'https://creativecommons.org/licenses/by-sa/4.0/deed.es'
 const HERO_WIDTH = 960 // a standard Wikimedia thumbnail step
@@ -59,6 +60,8 @@ export function Reader({ title }: { title: string }) {
   }, [title])
 
   const cards = useSuggestions(page?.summary.title ?? title, page?.summary.wikibase_item ?? null, page?.nodeId ?? null)
+  const articleRef = useRef<HTMLElement>(null)
+  const signals = useReadingSignals(page?.nodeId ?? null, page?.summary.wikibase_item ?? null, articleRef)
 
   const intro = useMemo(() => withCredits((full ?? page?.lead)?.lead ?? '', credits), [full, page, credits])
   const sections = useMemo(
@@ -67,6 +70,7 @@ export function Reader({ title }: { title: string }) {
   )
 
   async function openFull() {
+    signals.openedFull()
     setLoadingFull(true)
     try {
       const article = cleanArticle(await getArticleHtml(title, false))
@@ -94,7 +98,7 @@ export function Reader({ title }: { title: string }) {
 
   return (
     <main className="reader">
-      <article>
+      <article ref={articleRef}>
         <header>
           <h1>{summary.title}</h1>
           {summary.description && <p className="muted">{summary.description}</p>}
@@ -123,7 +127,7 @@ export function Reader({ title }: { title: string }) {
           <>
             <div className="prose" onClick={onTextClick}>
               {sections.map((s) => (
-                <details key={s.id || s.title}>
+                <details key={s.id || s.title} onToggle={(e) => e.currentTarget.open && signals.openedSection(s.title)}>
                   <summary>{s.title}</summary>
                   <div dangerouslySetInnerHTML={{ __html: s.html }} />
                 </details>

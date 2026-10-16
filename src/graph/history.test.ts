@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { emptyState } from '../storage/store'
-import { addVisit, setCurrent, setSuggestionsShown } from './history'
+import { addVisit, nudgeInterests, recordSignal, setCurrent, setSuggestionsShown } from './history'
+
+describe('signals', () => {
+  const signal = { nodeId: 'a', activeMs: 1, maxScrollDepth: 0.2, reachedSuggestions: false, openedFull: false, sectionsOpened: [] }
+
+  it('keeps one signal per node', () => {
+    let s = recordSignal(emptyState(), signal)
+    s = recordSignal(s, { ...signal, activeMs: 5 })
+    expect(s.signals).toEqual([{ ...signal, activeMs: 5 }])
+  })
+
+  it('nudges interests softly and caps them', () => {
+    expect(nudgeInterests({ art: 1, nature: 0.95 }, ['art', 'nature', 'space'])).toEqual({ art: 1, nature: 1, space: 0.1 })
+  })
+})
 
 const visit = (id: string, title: string, chosenFrom: 'seed' | 'link' | 'suggestion') =>
   ({ id, title, qid: null, chosenFrom, now: 1 })
