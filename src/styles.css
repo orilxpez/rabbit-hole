@@ -184,6 +184,17 @@ img { background: #fff; } /* transparent diagrams always sit on white */
 .article-head { padding-bottom: 0.75rem; border-bottom: 1px solid var(--ink); }
 .article-desc { margin: 0; font-size: 1rem; color: var(--graphite); }
 
+.text-switch {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font: 500 0.875rem var(--ui);
+  color: var(--graphite);
+  background: none;
+  border: 0;
+}
+button.text-switch { min-height: 32px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+button.text-switch:hover { color: var(--ink); background: var(--marker); }
+
 .hero { margin: 1.25rem 0 1.5rem; }
 .hero img {
   max-height: 70vh;

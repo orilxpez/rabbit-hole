@@ -1,8 +1,17 @@
 import { DAY, cachedFetch, withParams } from './http'
 
 const REST = 'https://en.wikipedia.org/api/rest_v1'
-const ACTION = 'https://en.wikipedia.org/w/api.php'
 const BATCH = 50 // Action API limit for titles per request
+
+/**
+ * English Wikipedia drives everything (engine, graph, Wikidata). Spanish Wikipedia is
+ * only read when the reader uses the Spanish interface and the article exists there:
+ * a human-written article instead of a machine translation.
+ */
+export type Wiki = 'en' | 'es'
+
+export const articleUrl = (title: string, wiki: Wiki = 'en') =>
+  `https://${wiki}.wikipedia.org/wiki/${encodeURIComponent(title.replaceAll(' ', '_'))}`
 
 export interface Image {
   source: string
@@ -35,15 +44,15 @@ export interface PageInfo {
 
 const pathTitle = (title: string) => encodeURIComponent(title.replaceAll(' ', '_'))
 
-export function getSummary(title: string): Promise<Summary> {
-  return cachedFetch(`${REST}/page/summary/${pathTitle(title)}`, { ttlMs: DAY })
+export function getSummary(title: string, wiki: Wiki = 'en'): Promise<Summary> {
+  return cachedFetch(`${REST.replace('en.', `${wiki}.`)}/page/summary/${pathTitle(title)}`, { ttlMs: DAY })
 }
 
 /**
  * Rendered article HTML. `leadOnly` fetches just the introduction (~50 KB, with its links:
  * the REST summary has none). The full article (~1 MB) only fits in the memory cache.
  */
-export async function getArticleHtml(title: string, leadOnly: boolean): Promise<string> {
+export async function getArticleHtml(title: string, leadOnly: boolean, wiki: Wiki = 'en'): Promise<string> {
   const res = await action<{ parse?: { text: string } }>({
     action: 'parse',
     page: title,
@@ -52,8 +61,30 @@ export async function getArticleHtml(title: string, leadOnly: boolean): Promise<
     redirects: 1,
     disableeditsection: 1,
     disablelimitreport: 1,
-  })
+  }, DAY, wiki)
   return res.parse?.text ?? ''
+}
+
+/** Spanish Wikipedia title of each English article that has one, keyed by requested title. */
+export async function getSpanishTitles(titles: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const batch of chunk([...new Set(titles)], BATCH)) {
+    const res = await action<QueryResponse>({
+      prop: 'langlinks', lllang: 'es', lllimit: 'max', redirects: 1, titles: batch.join('|'),
+    }, 7 * DAY)
+    const es = new Map((res.query?.pages ?? []).flatMap((p) => (p.langlinks?.[0] ? [[p.title, p.langlinks[0].title] as const] : [])))
+    for (const [requested, final] of resolveTitles(batch, res)) {
+      const t = es.get(final)
+      if (t) out.set(requested, t)
+    }
+  }
+  return out
+}
+
+/** English article for a Spanish one, to follow a link of the Spanish text inside the app. */
+export async function getEnglishTitle(esTitle: string): Promise<string | null> {
+  const res = await action<QueryResponse>({ prop: 'langlinks', lllang: 'en', redirects: 1, titles: esTitle }, 7 * DAY, 'es')
+  return res.query?.pages?.[0]?.langlinks?.[0]?.title ?? null
 }
 
 export interface ImageCredit {
@@ -98,8 +129,9 @@ export function fileNameFromUrl(url: string): string | null {
   return name ? decodeURIComponent(name).replaceAll('_', ' ') : null
 }
 
-function action<T>(params: Record<string, string | number>, ttlMs = DAY): Promise<T> {
-  return cachedFetch(withParams(ACTION, { action: 'query', format: 'json', formatversion: 2, origin: '*', ...params }), { ttlMs })
+function action<T>(params: Record<string, string | number>, ttlMs = DAY, wiki: Wiki = 'en'): Promise<T> {
+  const url = `https://${wiki}.wikipedia.org/w/api.php`
+  return cachedFetch(withParams(url, { action: 'query', format: 'json', formatversion: 2, origin: '*', ...params }), { ttlMs })
 }
 
 interface QueryPage {
@@ -110,6 +142,7 @@ interface QueryPage {
   thumbnail?: { source: string }
   pageviews?: Record<string, number | null>
   links?: { title: string }[]
+  langlinks?: { title: string }[]
 }
 
 interface QueryResponse {

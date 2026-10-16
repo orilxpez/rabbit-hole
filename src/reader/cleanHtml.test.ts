@@ -86,6 +86,16 @@ describe('cleanArticle', () => {
     expect(out).toContain('>Ann, CC0</a>')
   })
 
+  it('handles Spanish Wikipedia namespaces and reference sections', () => {
+    const es = cleanArticle(`<div class="mw-parser-output">
+      <p><a href="/wiki/Imperio_bizantino">Imperio</a>, <a href="/wiki/Anexo:Mezquitas">lista</a>, <a href="/wiki/Archivo:X.jpg">imagen</a>.</p>
+      <div class="mw-heading mw-heading2"><h2 id="Historia">Historia</h2></div><p>Texto.</p>
+      <div class="mw-heading mw-heading2"><h2 id="Referencias">Referencias</h2></div><p>Ref.</p>
+    </div>`)
+    expect(es.links.map((l) => l.title)).toEqual(['Imperio bizantino'])
+    expect(es.sections.map((s) => s.title)).toEqual(['Historia'])
+  })
+
   it('drops MediaWiki cite warnings left by parsing only the introduction', () => {
     const lead = cleanArticle('<div class="mw-parser-output"><p>Text</p><div class="mw-references-wrap"></div><span class="error mw-ext-cite-error">Cite error: {{reflist}} template</span></div>')
     expect(lead.lead).toBe('<p>Text</p>')

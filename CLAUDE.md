@@ -32,7 +32,7 @@ Reglas obligatorias:
 
 ## Convenciones
 
-- Código, nombres y comentarios en inglés. Interfaz en inglés por defecto, con selector EN/ES (`src/i18n.ts`); todo texto de interfaz nuevo va en ambos idiomas. Los artículos son siempre de la Wikipedia en inglés (`lang="en"`). La vista `/debug` es interna y está en español.
+- Código, nombres y comentarios en inglés. Interfaz en inglés por defecto, con selector EN/ES (`src/i18n.ts`); todo texto de interfaz nuevo va en ambos idiomas. El texto del artículo lleva el `lang` de su Wikipedia (ver "Idioma de los artículos"). La vista `/debug` es interna y está en español.
 - Lógica del motor de sugerencias en funciones puras y testeadas (Vitest).
 - Pesos del scoring en un único archivo de configuración, fácil de ajustar.
 - Toda escritura en `localStorage` pasa por una capa de almacenamiento con versión de esquema.
@@ -56,4 +56,10 @@ Reglas obligatorias:
 
 ## Fuera de alcance del MVP
 
-Búsqueda, LLM, login/cuentas, exportar mapa, monetización. Traducción de artículos al español: pendiente (propuesta: Microsoft Translator detrás de una función de Vercel). El modelo de datos sí debe estar preparado para mapa y bifurcaciones.
+Búsqueda, LLM, login/cuentas, exportar mapa, monetización y traducción automática. El modelo de datos sí debe estar preparado para mapa y bifurcaciones.
+
+## Idioma de los artículos
+
+- La Wikipedia en inglés manda: motor, grafo, Wikidata y URLs (`/a/<título inglés>`).
+- Con la interfaz en español, si el artículo existe en la Wikipedia en español (`langlinks`), se lee esa versión, escrita por personas, con un botón para ver el original inglés. Si no existe, se lee en inglés con un aviso. No se traduce nada automáticamente.
+- Los enlaces del texto en español llevan a su artículo inglés dentro de la app; si no lo hay, se abren en es.wikipedia.

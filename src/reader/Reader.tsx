@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
-  fileNameFromUrl, getArticleHtml, getImageCredits, getSummary, type ImageCredit, type Summary,
+  articleUrl, fileNameFromUrl, getArticleHtml, getEnglishTitle, getImageCredits, getSpanishTitles, getSummary,
+  type ImageCredit, type Summary, type Wiki,
 } from '../api/wikipedia'
 import { addVisit, setCurrent } from '../graph/history'
-import { articlePath, linkHandler, markVisitRecorded, navState, screenReady } from '../router'
+import { articlePath, linkHandler, markVisitRecorded, navState, navigate, screenReady } from '../router'
 import { useT } from '../i18n'
 import { getState, update } from '../state'
 import { cleanArticle, withCredits, type CleanArticle } from './cleanHtml'
@@ -35,9 +36,25 @@ function heroImage(s: Summary): string | null {
   return s.thumbnail.source.replace(/\/\d+px-/, `/${HERO_WIDTH}px-`)
 }
 
+/** The text of one language version: its summary (title, description), intro and, once opened, the full article. */
+interface Text {
+  summary: Summary
+  lead: CleanArticle
+  full?: CleanArticle
+}
+
+async function loadText(title: string, wiki: Wiki): Promise<Text> {
+  const [summary, html] = await Promise.all([getSummary(title, wiki), getArticleHtml(title, true, wiki)])
+  return { summary, lead: cleanArticle(html) }
+}
+
 export function Reader({ title }: { title: string }) {
-  const [page, setPage] = useState<{ summary: Summary; lead: CleanArticle; nodeId: string } | null>(null)
-  const [full, setFull] = useState<CleanArticle | null>(null)
+  const t = useT()
+  const [nodeId, setNodeId] = useState<string | null>(null)
+  const [texts, setTexts] = useState<Partial<Record<Wiki, Text>>>({})
+  // Spanish title of this article: undefined while unknown, null if there is no Spanish article.
+  const [esTitle, setEsTitle] = useState<string | null | undefined>(undefined)
+  const [prefer, setPrefer] = useState<Wiki | null>(null)
   const [loadingFull, setLoadingFull] = useState(false)
   const [error, setError] = useState<'loadError' | 'loadFullError' | null>(null)
   const [credits, setCredits] = useState<Map<string, ImageCredit>>(new Map())
@@ -46,46 +63,78 @@ export function Reader({ title }: { title: string }) {
     if (files.length) getImageCredits(files).then((c) => setCredits((prev) => new Map([...prev, ...c]))).catch(() => {})
   }
 
+  // English is always loaded: it drives the visit, the engine and the hero image.
   useEffect(() => {
     let cancelled = false
-    Promise.all([getSummary(title), getArticleHtml(title, true)])
-      .then(([summary, leadHtml]) => {
+    loadText(title, 'en')
+      .then((en) => {
         if (cancelled) return
-        const lead = cleanArticle(leadHtml)
-        setPage({ summary, lead, nodeId: recordVisit(summary) })
-        document.title = `${summary.title}, rabbit hole`
-        const hero = summary.originalimage && fileNameFromUrl(summary.originalimage.source)
-        loadCredits([...(hero ? [hero] : []), ...lead.files])
+        setTexts((x) => ({ ...x, en }))
+        setNodeId(recordVisit(en.summary))
+        document.title = `${en.summary.title}, rabbit hole`
+        const hero = en.summary.originalimage && fileNameFromUrl(en.summary.originalimage.source)
+        loadCredits([...(hero ? [hero] : []), ...en.lead.files])
       })
       .catch(() => !cancelled && setError('loadError'))
     return () => { cancelled = true }
   }, [title])
 
+  // Spanish interface: is there a Spanish article? (One cached request, in parallel with the above.)
+  useEffect(() => {
+    if (t.lang !== 'es' || esTitle !== undefined) return
+    getSpanishTitles([title]).then((m) => setEsTitle(m.get(title) ?? null), () => setEsTitle(null))
+  }, [t.lang, title, esTitle])
+
+  // Spanish Wikipedia when the interface is Spanish and the article exists there; English otherwise.
+  const wiki: Wiki = (prefer ?? t.lang) === 'es' && esTitle ? 'es' : 'en'
+  const waitingForSpanish = t.lang === 'es' && prefer !== 'en' && esTitle === undefined
+
+  useEffect(() => {
+    if (wiki !== 'es' || texts.es || !esTitle) return
+    let cancelled = false
+    loadText(esTitle, 'es')
+      .then((es) => { if (!cancelled) { setTexts((x) => ({ ...x, es })); loadCredits(es.lead.files) } })
+      .catch(() => !cancelled && setPrefer('en')) // the English text is there to fall back on
+    return () => { cancelled = true }
+  }, [wiki, esTitle, texts.es])
+
+  const text = waitingForSpanish ? undefined : texts[wiki]
+  const ready = !!text && !!nodeId
+
   // The transition from the previous screen waits for this frame, so the hero can morph.
-  useLayoutEffect(() => { if (page || error) screenReady() }, [page, error])
+  useLayoutEffect(() => { if (ready || error) screenReady() }, [ready, error])
 
-  const t = useT()
-  const { cards, revealed, reveal } = useSuggestions(title, page?.nodeId ?? null)
+  const { cards, revealed, reveal } = useSuggestions(title, nodeId)
   const articleRef = useRef<HTMLElement>(null)
-  const signals = useReadingSignals(page?.nodeId ?? null, page?.summary.wikibase_item ?? null, articleRef)
+  const en = texts.en?.summary
+  const signals = useReadingSignals(nodeId, en?.wikibase_item ?? null, articleRef)
 
-  const heroFile = page?.summary.originalimage ? fileNameFromUrl(page.summary.originalimage.source) : null
+  // Card titles and sentences in Spanish, when the reader reads Spanish.
+  const [cardTitlesEs, setCardTitlesEs] = useState<Map<string, string>>(new Map())
+  const cardKey = cards?.map((c) => c.title).join('|') ?? ''
+  useEffect(() => {
+    if (wiki !== 'es' || !cardKey) return
+    getSpanishTitles(cardKey.split('|')).then(setCardTitlesEs).catch(() => {})
+  }, [wiki, cardKey])
+
+  const heroFile = en?.originalimage ? fileNameFromUrl(en.originalimage.source) : null
   const intro = useMemo(
-    () => withCredits((full ?? page?.lead)?.lead ?? '', credits, heroFile),
-    [full, page, credits, heroFile],
+    () => withCredits((text?.full ?? text?.lead)?.lead ?? '', credits, heroFile),
+    [text, credits, heroFile],
   )
   const sections = useMemo(
-    () => full?.sections.map((s) => ({ ...s, html: withCredits(s.html, credits) })) ?? [],
-    [full, credits],
+    () => text?.full?.sections.map((s) => ({ ...s, html: withCredits(s.html, credits) })) ?? [],
+    [text, credits],
   )
 
   async function openFull() {
+    if (!text) return
     signals.openedFull()
     setLoadingFull(true)
     try {
-      const article = cleanArticle(await getArticleHtml(title, false))
-      setFull(article)
-      loadCredits(article.files)
+      const full = cleanArticle(await getArticleHtml(text.summary.title, false, wiki))
+      setTexts((x) => ({ ...x, [wiki]: { ...x[wiki]!, full } }))
+      loadCredits(full.files)
     } catch {
       setError('loadFullError')
     } finally {
@@ -93,33 +142,48 @@ export function Reader({ title }: { title: string }) {
     }
   }
 
-  // Links inside Wikipedia text open in the app and count as the reader's choice.
-  function onTextClick(e: MouseEvent<HTMLElement>) {
+  // Links inside Wikipedia text open in the app and count as the reader's choice. A link
+  // in the Spanish text goes to its English article; with none, it opens on Wikipedia.
+  async function onTextClick(e: MouseEvent<HTMLElement>) {
     const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-title]')
-    if (a) linkHandler(articlePath(a.dataset.title!), { from: 'link' })(e)
+    if (!a) return
+    if (wiki === 'en') return linkHandler(articlePath(a.dataset.title!), { from: 'link' })(e)
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    const target = await getEnglishTitle(a.dataset.title!).catch(() => null)
+    if (target) navigate(articlePath(target), { from: 'link' })
+    else window.open(articleUrl(a.dataset.title!, 'es'), '_blank', 'noopener')
   }
 
-  const summary = page?.summary
-  const hero = summary && heroImage(summary)
-  const heroCredit = summary?.originalimage && credits.get(fileNameFromUrl(summary.originalimage.source) ?? '')
+  const summary = text?.summary
+  const hero = en && heroImage(en)
+  const heroCredit = en?.originalimage && credits.get(fileNameFromUrl(en.originalimage.source) ?? '')
+  const other: Wiki = wiki === 'es' ? 'en' : 'es'
 
   return (
     <main className="page reader">
       {/* The title is known from the URL, so the page has its headline before any request returns. */}
-      <article ref={articleRef} lang="en">
+      <article ref={articleRef} lang={wiki}>
         <header className="article-head">
-          <Display text={summary?.title ?? title} />
-          <p className="article-desc">{summary?.description ?? ' '}</p>
+          <Display text={summary?.title ?? (waitingForSpanish ? ' ' : title)} />
+          <p className="article-desc">{summary?.description ?? ' '}</p>
+          {t.lang === 'es' && esTitle !== undefined && (
+            esTitle
+              ? <button type="button" className="text-switch" onClick={() => setPrefer(other)}>
+                  {other === 'en' ? t('readInEnglish') : t('readInSpanish')}
+                </button>
+              : <p className="text-switch">{t('onlyEnglish')}</p>
+          )}
         </header>
 
-        {error && !page && <p className="error">{t(error)}</p>}
-        {!page && !error && <p className="sr-only">{t('loading')}</p>}
+        {error && !text && <p className="error">{t(error)}</p>}
+        {!text && !error && <p className="sr-only">{t('loading')}</p>}
 
         {hero && (
           <figure className="frame hero">
             {/* The small thumbnail is already cached (it was the card image), so it shows at
                 once behind the large one while that loads. */}
-            <img src={hero} alt="" style={summary.thumbnail ? { backgroundImage: `url("${summary.thumbnail.source}")` } : undefined} />
+            <img src={hero} alt="" style={en?.thumbnail ? { backgroundImage: `url("${en.thumbnail.source}")` } : undefined} />
             {heroCredit && (
               <figcaption>
                 <a className="credit" href={heroCredit.descriptionUrl} target="_blank" rel="noopener noreferrer">
@@ -129,15 +193,15 @@ export function Reader({ title }: { title: string }) {
             )}
           </figure>
         )}
-        {page && <div className="prose" onClick={onTextClick} dangerouslySetInnerHTML={{ __html: intro }} />}
+        {text && <div className="prose" onClick={onTextClick} dangerouslySetInnerHTML={{ __html: intro }} />}
 
-        {page && !full && (
+        {text && !text.full && (
           <button className="button" onClick={openFull} disabled={loadingFull}>
             {loadingFull ? t('loading') : t('readFull')}
           </button>
         )}
-        {error && page && <p className="error">{t(error)}</p>}
-        {full && (
+        {error && text && <p className="error">{t(error)}</p>}
+        {text?.full && (
           <div className="prose sections" onClick={onTextClick}>
             {sections.map((s) => (
               <details key={s.id || s.title} onToggle={(e) => e.currentTarget.open && signals.openedSection(s.title)}>
@@ -149,11 +213,16 @@ export function Reader({ title }: { title: string }) {
         )}
 
         {/* One way down, after whatever the reader chose to read. */}
-        <NextPath cards={cards} revealed={revealed} onReveal={reveal} />
+        <NextPath
+          cards={cards}
+          revealed={revealed}
+          onReveal={reveal}
+          spanish={wiki === 'es' && text ? { titles: cardTitlesEs, links: (text.full ?? text.lead).links } : null}
+        />
 
         {summary && (
           <footer className="attribution">
-            {t('attrText')} <a href={summary.content_urls.desktop.page} target="_blank" rel="noopener noreferrer">{summary.title} {t('attrOnWikipedia')}</a>
+            {t('attrText')} <a href={articleUrl(summary.title, wiki)} target="_blank" rel="noopener noreferrer">{summary.title} {t('attrOnWikipedia')}</a>
             {t('attrLicense')} <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.
             {' '}{t('attrImages')}
           </footer>

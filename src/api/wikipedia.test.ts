@@ -15,6 +15,22 @@ describe('resolveTitles', () => {
   })
 })
 
+describe('getSpanishTitles', () => {
+  it('maps requested English titles to their Spanish article, through redirects', async () => {
+    const { vi } = await import('vitest')
+    const { memoryStorage } = await import('../test/memoryStorage')
+    vi.stubGlobal('localStorage', memoryStorage())
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      query: {
+        redirects: [{ from: 'Ayasofya', to: 'Hagia Sophia' }],
+        pages: [{ title: 'Hagia Sophia', langlinks: [{ title: 'Santa Sofía' }] }, { title: 'Squinch' }],
+      },
+    }))))
+    const { getSpanishTitles } = await import('./wikipedia')
+    expect(await getSpanishTitles(['Ayasofya', 'Squinch'])).toEqual(new Map([['Ayasofya', 'Santa Sofía']]))
+  })
+})
+
 describe('averageViews', () => {
   it('ignores days without data', () => {
     expect(averageViews({ a: 10, b: null, c: 20 })).toBe(15)

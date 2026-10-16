@@ -6,7 +6,7 @@ import { useT } from '../i18n'
 import { articlePath, navigate } from '../router'
 import { getState, update } from '../state'
 import { Thumb } from '../ui'
-import { excerpt, type Quote } from './cleanHtml'
+import { excerpt, type ArticleLink, type Quote } from './cleanHtml'
 
 const PREFETCH_DELAY_MS = 1500
 
@@ -67,28 +67,39 @@ interface Props {
   cards: Card[] | null
   revealed: boolean
   onReveal: () => void
+  /** When the reader reads Spanish Wikipedia: Spanish titles of the cards and the links of the Spanish text. */
+  spanish: { titles: Map<string, string>; links: ArticleLink[] } | null
 }
 
-export function NextPath({ cards, revealed, onReveal }: Props) {
+export function NextPath({ cards, revealed, onReveal, spanish }: Props) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const listId = useId()
   if (cards && !cards.length) return null
   const [next, ...others] = cards ?? []
 
+  // In Spanish, show the Spanish title and the Spanish sentence where it is linked; the English
+  // description and sentence would mix languages, so they are left out. Navigation stays English.
+  const shown = (c: Card) => {
+    if (!spanish) return { title: c.title, description: c.description, sentence: c.sentence }
+    const es = spanish.titles.get(c.title)
+    return { title: es ?? c.title, description: null, sentence: (es && spanish.links.find((l) => l.title === es)?.sentence) || null }
+  }
+  const n = next && shown(next)
+
   return (
     <section className="next" aria-label={t('downTheHole')} aria-busy={!cards}>
       <h2 className="label">{t('downTheHole')}</h2>
-      {!next ? (
+      {!next || !n ? (
         <div className="next-card skeleton" aria-hidden="true"><p className="sr-only">{t('findingNext')}</p></div>
       ) : (
         <a className="next-card" href={articlePath(next.title)} onClick={(e) => follow(next.title, e)}>
           <Thumb src={next.thumbnail} className="next-thumb" />
           <span className="next-body">
             <span className="pill">{t.relation(next.relation)}</span>
-            <strong className="next-title">{next.title}</strong>
-            {next.description && <span className="next-desc">{next.description}</span>}
-            {next.sentence && <Excerpt quote={next.sentence} />}
+            <strong className="next-title">{n.title}</strong>
+            {n.description && <span className="next-desc">{n.description}</span>}
+            {n.sentence && <Excerpt quote={n.sentence} />}
             <span className="button primary next-go">{t('goDeeper')}</span>
           </span>
         </a>
@@ -107,18 +118,21 @@ export function NextPath({ cards, revealed, onReveal }: Props) {
           </button>
           <div className="paths-panel" id={listId} inert={!open}>
             <ul className="paths-list">
-              {others.map((c, i) => (
+              {others.map((c, i) => {
+                const s = shown(c)
+                return (
                 <li key={c.title} style={{ '--i': i } as CSSProperties}>
                   <a className="path" href={articlePath(c.title)} onClick={(e) => follow(c.title, e)}>
                     <Thumb src={c.thumbnail} className="path-thumb" />
                     <span className="path-body">
-                      <strong>{c.title}</strong>
-                      {c.sentence ? <Excerpt quote={c.sentence} /> : c.description && <span className="next-desc">{c.description}</span>}
+                      <strong>{s.title}</strong>
+                      {s.sentence ? <Excerpt quote={s.sentence} /> : s.description && <span className="next-desc">{s.description}</span>}
                     </span>
                     <span className="pill">{t.relation(c.relation)}</span>
                   </a>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </div>
         </div>

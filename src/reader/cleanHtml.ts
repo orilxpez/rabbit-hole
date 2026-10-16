@@ -43,9 +43,10 @@ const REMOVE = [
   '.mw-ext-cite-error', '.cite-error', '.error',
 ].join(',')
 
-const DROPPED_SECTIONS = /^(notes|references|citations|sources|bibliography|further reading|external links|footnotes|works cited|explanatory notes|general (and cited )?(sources|references))$/i
+// English and Spanish Wikipedia section names.
+const DROPPED_SECTIONS = /^(notes|references|citations|sources|bibliography|further reading|external links|footnotes|works cited|explanatory notes|general (and cited )?(sources|references)|notas|referencias|notas y referencias|bibliografía|enlaces externos|fuentes|lecturas adicionales|obras citadas)$/i
 
-const NAMESPACES = /^(file|image|category|help|wikipedia|template|portal|special|talk|module|draft|user|mediawiki|wp|wikt|commons):/i
+const NAMESPACES = /^(file|image|category|help|wikipedia|template|portal|special|talk|module|draft|user|mediawiki|wp|wikt|commons|archivo|imagen|categoría|ayuda|plantilla|especial|discusión|módulo|usuario|anexo|wikiproyecto):/i
 
 const MAX_EXCERPT = 150 // characters of a sentence shown on a suggestion card
 
