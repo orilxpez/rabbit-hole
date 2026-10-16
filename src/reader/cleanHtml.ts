@@ -15,7 +15,14 @@ export interface ArticleLink {
   section: number
   sectionTitle: string | null
   /** Sentence of the article where the link first appears, if it is inside a paragraph. */
-  sentence: string | null
+  sentence: Quote | null
+}
+
+/** A sentence and the position of the linked words inside it. */
+export interface Quote {
+  text: string
+  start: number
+  end: number
 }
 
 export interface CleanArticle {
@@ -38,7 +45,7 @@ const DROPPED_SECTIONS = /^(notes|references|citations|sources|bibliography|furt
 
 const NAMESPACES = /^(file|image|category|help|wikipedia|template|portal|special|talk|module|draft|user|mediawiki|wp|wikt|commons):/i
 
-const MAX_SENTENCE = 300
+const MAX_EXCERPT = 150 // characters of a sentence shown on a suggestion card
 
 export function cleanArticle(html: string): CleanArticle {
   const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -152,19 +159,45 @@ function fixLinks(root: Element) {
 
 const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' })
 
-function sentenceAround(p: Element, a: Element): string {
+function sentenceAround(p: Element, a: Element): Quote | null {
   const range = p.ownerDocument.createRange()
   range.setStart(p, 0)
   range.setEndBefore(a)
   // Collapse whitespace first: a raw newline inside a paragraph is a hard sentence break for Intl.Segmenter.
   const squash = (s: string) => s.replace(/\s+/g, ' ')
   const offset = squash(range.toString()).length
+  const linkLength = squash(a.textContent ?? '').length
   const text = squash(p.textContent ?? '')
   for (const { segment, index } of segmenter.segment(text)) {
     if (offset < index + segment.length) {
-      const s = segment.trim()
-      return s.length > MAX_SENTENCE ? s.slice(0, MAX_SENTENCE - 1) + '…' : s
+      const lead = segment.length - segment.trimStart().length
+      const start = offset - index - lead
+      return { text: segment.trim(), start, end: start + linkLength }
     }
   }
-  return ''
+  return null
+}
+
+/**
+ * A window of the sentence that always contains the linked words, so a card can
+ * show why it is suggested even when the link sits at the end of a long sentence.
+ */
+export function excerpt(q: Quote, max = MAX_EXCERPT): { before: string; link: string; after: string } {
+  let from = 0
+  let to = q.text.length
+  if (to > max) {
+    const room = max - (q.end - q.start)
+    from = Math.max(0, q.start - Math.floor(room / 3))
+    to = Math.min(q.text.length, from + max)
+    from = Math.max(0, to - max)
+    // Snap to word boundaries, never past the linked words.
+    if (from > 0) from = Math.min(q.start, q.text.indexOf(' ', from) + 1 || q.start)
+    if (to < q.text.length) to = Math.max(q.end, q.text.lastIndexOf(' ', to))
+  }
+  const cut = (s: string, left: boolean, right: boolean) => (left ? '…' : '') + s + (right ? '…' : '')
+  return {
+    before: cut(q.text.slice(from, q.start), from > 0, false),
+    link: q.text.slice(q.start, q.end),
+    after: cut(q.text.slice(q.end, to), false, to < q.text.length),
+  }
 }

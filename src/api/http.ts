@@ -5,7 +5,7 @@ import { cacheGet, cacheSet } from '../storage/store'
 export const API_USER_AGENT = 'RabbitHole/0.1 (https://github.com/orilxpez/rabbit-hole)'
 
 export const DAY = 24 * 60 * 60 * 1000
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 3
 const MAX_RETRY_WAIT_MS = 5000
 
 const memory = new Map<string, unknown>()

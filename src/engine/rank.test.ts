@@ -136,10 +136,10 @@ describe('selectDiverse', () => {
 
 describe('relationLabel', () => {
   it('prefers direct statements, then shared values, then the default', () => {
-    expect(relationLabel([{ pid: 'P131', dir: 'shared' }, { pid: 'P84', dir: 'from' }])).toBe('Arquitecto')
-    expect(relationLabel([{ pid: 'P170', dir: 'to' }])).toBe('Obra')
-    expect(relationLabel([{ pid: 'P135', dir: 'shared' }])).toBe('Mismo movimiento')
-    expect(relationLabel([{ pid: 'P140', dir: 'to' }])).toBe('Relacionado')
-    expect(relationLabel([])).toBe('Relacionado')
+    expect(relationLabel([{ pid: 'P131', dir: 'shared' }, { pid: 'P84', dir: 'from' }])).toBe('Architect')
+    expect(relationLabel([{ pid: 'P170', dir: 'to' }])).toBe('Work')
+    expect(relationLabel([{ pid: 'P135', dir: 'shared' }])).toBe('Same movement')
+    expect(relationLabel([{ pid: 'P140', dir: 'to' }])).toBe('Related')
+    expect(relationLabel([])).toBe('Related')
   })
 })

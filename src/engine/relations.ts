@@ -1,47 +1,48 @@
 // Relation labels derived from direct Wikidata statements between the current
 // article and a candidate. Order matters: the first matching row wins.
+// Labels are English; src/i18n.ts translates them for the interface.
 //
 // Columns: [current → candidate, candidate → current, both share the same value].
-// E.g. P170 creator: current's creator is the candidate → "Creador";
-// the candidate's creator is the current article → "Obra"; same creator → "Mismo creador".
+// E.g. P170 creator: current's creator is the candidate → "Creator";
+// the candidate's creator is the current article → "Work"; same creator → "Same creator".
 
 type Labels = [from: string | null, to: string | null, shared: string | null]
 
 export const RELATIONS: [pid: string, labels: Labels][] = [
-  ['P737', ['Influencia', 'Influencia', null]], // influenced by
-  ['P135', ['Movimiento', 'Del movimiento', 'Mismo movimiento']],
-  ['P170', ['Creador', 'Obra', 'Mismo creador']],
-  ['P50', ['Autor', 'Obra', 'Mismo autor']],
-  ['P84', ['Arquitecto', 'Obra', 'Mismo arquitecto']],
-  ['P86', ['Compositor', 'Obra', 'Mismo compositor']],
-  ['P88', ['Encargado por', 'Encargo', null]], // commissioned by
-  ['P61', ['Inventor', 'Invento', null]], // discoverer or inventor
-  ['P800', ['Obra destacada', 'Autor', null]], // notable work
-  ['P112', ['Fundador', 'Fundación', null]], // founded by
-  ['P144', ['Basado en', 'Adaptación', null]], // based on
-  ['P138', ['Origen del nombre', 'Lleva su nombre', null]], // named after
-  ['P155', ['Anterior', 'Siguiente', null]], // follows
-  ['P156', ['Siguiente', 'Anterior', null]], // followed by
-  ['P1365', ['Predecesor', 'Sucesor', null]], // replaces
-  ['P1366', ['Sucesor', 'Predecesor', null]], // replaced by
-  ['P361', ['Parte de', 'Componente', 'Mismo conjunto']], // part of
-  ['P527', ['Componente', 'Parte de', null]], // has part
-  ['P607', ['Conflicto', 'Participante', 'Mismo conflicto']],
-  ['P710', ['Participante', 'Participó', null]], // participant
-  ['P1344', ['Participó', 'Participante', null]], // participant in
-  ['P19', ['Lugar de nacimiento', 'Nació aquí', null]],
-  ['P20', ['Lugar de muerte', 'Murió aquí', null]],
-  ['P69', ['Formación', 'Alumno', 'Misma escuela']], // educated at
-  ['P101', ['Campo', 'Figura del campo', 'Mismo campo']], // field of work
-  ['P921', ['Tema', 'Obra sobre el tema', 'Mismo tema']], // main subject
-  ['P140', ['Religión', null, null]],
-  ['P279', ['Categoría más amplia', 'Variante', null]], // subclass of
-  ['P31', ['Tipo', 'Ejemplo', null]], // instance of
-  ['P131', ['Ubicación', 'Lugar dentro', 'Mismo lugar']], // located in admin. entity
-  ['P276', ['Ubicación', 'Lugar dentro', 'Mismo lugar']], // location
+  ['P737', ['Influence', 'Influence', null]], // influenced by
+  ['P135', ['Movement', 'From the movement', 'Same movement']],
+  ['P170', ['Creator', 'Work', 'Same creator']],
+  ['P50', ['Author', 'Work', 'Same author']],
+  ['P84', ['Architect', 'Work', 'Same architect']],
+  ['P86', ['Composer', 'Work', 'Same composer']],
+  ['P88', ['Commissioned by', 'Commission', null]],
+  ['P61', ['Inventor', 'Invention', null]], // discoverer or inventor
+  ['P800', ['Notable work', 'Author', null]],
+  ['P112', ['Founder', 'Founded', null]], // founded by
+  ['P144', ['Based on', 'Adaptation', null]],
+  ['P138', ['Named after', 'Named after it', null]],
+  ['P155', ['Previous', 'Next', null]], // follows
+  ['P156', ['Next', 'Previous', null]], // followed by
+  ['P1365', ['Predecessor', 'Successor', null]], // replaces
+  ['P1366', ['Successor', 'Predecessor', null]], // replaced by
+  ['P361', ['Part of', 'Component', 'Same whole']],
+  ['P527', ['Component', 'Part of', null]], // has part
+  ['P607', ['Conflict', 'Participant', 'Same conflict']],
+  ['P710', ['Participant', 'Took part', null]],
+  ['P1344', ['Took part', 'Participant', null]], // participant in
+  ['P19', ['Birthplace', 'Born here', null]],
+  ['P20', ['Place of death', 'Died here', null]],
+  ['P69', ['Education', 'Alumnus', 'Same school']], // educated at
+  ['P101', ['Field', 'Figure in the field', 'Same field']], // field of work
+  ['P921', ['Subject', 'Work on this', 'Same subject']], // main subject
+  ['P140', ['Religion', null, null]],
+  ['P279', ['Broader category', 'Variant', null]], // subclass of
+  ['P31', ['Type', 'Example', null]], // instance of
+  ['P131', ['Location', 'Place within', 'Same place']], // located in admin. entity
+  ['P276', ['Location', 'Place within', 'Same place']], // location
 ]
 
-export const DEFAULT_RELATION = 'Relacionado'
+export const DEFAULT_RELATION = 'Related'
 
 export type Direction = 'from' | 'to' | 'shared'
 

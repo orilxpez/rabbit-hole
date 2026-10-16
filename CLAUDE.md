@@ -32,12 +32,20 @@ Reglas obligatorias:
 
 ## Convenciones
 
-- Código, nombres y comentarios en inglés. Textos de interfaz en español.
+- Código, nombres y comentarios en inglés. Interfaz en inglés por defecto, con selector EN/ES (`src/i18n.ts`); todo texto de interfaz nuevo va en ambos idiomas. Los artículos son siempre de la Wikipedia en inglés (`lang="en"`). La vista `/debug` es interna y está en español.
 - Lógica del motor de sugerencias en funciones puras y testeadas (Vitest).
 - Pesos del scoring en un único archivo de configuración, fácil de ajustar.
 - Toda escritura en `localStorage` pasa por una capa de almacenamiento con versión de esquema.
 - No usar rayas largas (em dash) en ningún texto de interfaz.
 
+## Diseño
+
+- Tema claro único, sin modo oscuro. Tokens en `:root` de `src/styles.css`.
+- Fuentes de Fontshare: Switzer (interfaz y titulares grotesk gigantes en mayúsculas) y Sentient (lectura).
+- Papel gris `#EDEDEA`, tinta negra pura, imágenes sobre blanco con marco al estilo clásico de Wikipedia. Las imágenes con transparencia siempre llevan fondo blanco.
+- Un único acento: amarillo rotulador `#F0E000`, solo para selección, estados activos y la palabra enlazada en las tarjetas.
+- Un solo elemento llamativo por pantalla (el título gigante); el resto, sobrio. Etiquetas en minúscula, nunca en mayúsculas espaciadas.
+
 ## Fuera de alcance del MVP
 
-Búsqueda, LLM, login/cuentas, pestaña de mapa, bifurcaciones, animaciones, exportar mapa, multidioma, monetización. El modelo de datos sí debe estar preparado para mapa y bifurcaciones.
+Búsqueda, LLM, login/cuentas, pestaña de mapa, bifurcaciones, animaciones, exportar mapa, monetización. Traducción de artículos al español: pendiente (propuesta: Microsoft Translator detrás de una función de Vercel). El modelo de datos sí debe estar preparado para mapa y bifurcaciones.

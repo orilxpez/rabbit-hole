@@ -81,7 +81,7 @@ export async function getImageCredits(fileNames: string[]): Promise<Map<string, 
       const info = p.imageinfo?.[0]
       if (!info) continue
       out.set(p.title.replace(/^File:/, ''), {
-        artist: stripTags(info.extmetadata?.Artist?.value ?? '') || 'Autor desconocido',
+        artist: stripTags(info.extmetadata?.Artist?.value ?? ''),
         license: info.extmetadata?.LicenseShortName?.value ?? '',
         descriptionUrl: info.descriptionurl,
       })

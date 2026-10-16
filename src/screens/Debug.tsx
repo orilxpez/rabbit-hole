@@ -37,8 +37,9 @@ export function Debug() {
   ]
 
   return (
-    <main className="reader">
-      <h1>Depuración</h1>
+    <main className="page">
+      {/* Internal view for the project owner: kept in Spanish, outside the EN/ES switch. */}
+      <h1 className="display">Depuración</h1>
       <table className="debug">
         <tbody>
           {rows.map(([k, v]) => (
@@ -46,8 +47,8 @@ export function Debug() {
           ))}
         </tbody>
       </table>
-      <button className="read-more primary" onClick={copy}>{copied ? 'Copiado' : 'Copiar métricas'}</button>
-      <p className="muted">Se copian solo totales y porcentajes, sin títulos de artículos.</p>
+      <button className="button primary" onClick={copy}>{copied ? 'Copiado' : 'Copiar métricas'}</button>
+      <p className="footnote">Se copian solo totales y porcentajes, sin títulos de artículos.</p>
     </main>
   )
 }

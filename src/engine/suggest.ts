@@ -1,8 +1,8 @@
 import { getAnchors, getFacts, type Facts } from '../api/wikidata'
-import { getArticleHtml, getLinkingBack, getMoreLike, getPageInfo } from '../api/wikipedia'
+import { getArticleHtml, getLinkingBack, getMoreLike, getPageInfo, getSummary } from '../api/wikipedia'
 import curatedJson from '../data/curated.json'
 import { visitedTitles } from '../graph/history'
-import { cleanArticle, type ArticleLink } from '../reader/cleanHtml'
+import { cleanArticle, type ArticleLink, type Quote } from '../reader/cleanHtml'
 import type { AppState } from '../storage/store'
 import { INTERESTS, TAGS_BY_ANCHOR } from './interests'
 import { isExcluded, preselectLinks, rank, selectDiverse, type Candidate, type Scored } from './rank'
@@ -13,6 +13,8 @@ import { LIMITS } from './weights'
 
 const curated: Record<string, string[]> = curatedJson
 const ALL_ANCHORS = Object.values(INTERESTS).flatMap((i) => i.anchors)
+const ANCHORS_BUDGET_MS = 700
+const wait = <T>(ms: number, value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
 export type SuggestionSource = 'curated' | 'engine'
 
@@ -22,32 +24,36 @@ export interface Card {
   thumbnail: string | null
   relation: string
   /** Sentence of the current article where the link appears. */
-  sentence: string | null
+  sentence: Quote | null
   /** Score breakdown, for debugging; absent for curated suggestions. */
   scored?: Scored
 }
 
 interface Input {
   title: string
-  qid: string | null
   state: AppState
 }
 
-export async function suggest({ title, qid, state }: Input): Promise<{ cards: Card[]; source: SuggestionSource }> {
+// The summary is only needed for the Q-id; the reader requests the same URL, so the
+// HTTP layer dedupes it and both start at once instead of one after the other.
+const qidOf = (title: string) => getSummary(title).then((s) => s.wikibase_item ?? null, () => null)
+
+export async function suggest({ title, state }: Input): Promise<{ cards: Card[]; source: SuggestionSource }> {
   const visited = visitedTitles(state)
   visited.add(title)
 
   // Experiment E1: hand-curated suggestions win where they exist.
   if (curated[title]) {
-    const html = await getArticleHtml(title, true)
+    const [html, qid] = await Promise.all([getArticleHtml(title, true), qidOf(title)])
     const links = new Map(cleanArticle(html).links.map((l) => [l.title, l]))
     const { candidates, facts } = await enrich(curated[title], links, new Set(), state, qid, visited)
     return { cards: candidates.slice(0, LIMITS.suggestions).map((c) => toCard(c, facts)), source: 'curated' }
   }
 
-  const [html, moreLike] = await Promise.all([
+  const [html, moreLike, qid] = await Promise.all([
     getArticleHtml(title, false),
     getMoreLike(title, LIMITS.moreLike).catch(() => [] as string[]),
+    qidOf(title),
   ])
   const article = cleanArticle(html)
   const picked = preselectLinks(article.links, LIMITS.linkCandidates)
@@ -98,9 +104,12 @@ async function enrich(
   const hasProfile = Object.values(state.interests).some((v) => v > 0)
   const empty: Facts = { types: new Map(), relations: new Map() }
   // If Wikidata is down, titles and descriptions still filter years, dates, lists and countries.
+  const none = new Map<string, string[]>()
   const [facts, anchors] = await Promise.all([
     getFacts(qid, qids, DIRECT_PIDS, SHARED_PIDS).catch(() => empty),
-    hasProfile ? getAnchors(qids, ALL_ANCHORS).catch(() => new Map<string, string[]>()) : new Map<string, string[]>(),
+    // Interest tags take ~1.5 s on WDQS: wait a little, then rank without affinity.
+    // The query keeps running and lands in the cache for the next visit.
+    hasProfile ? Promise.race([getAnchors(qids, ALL_ANCHORS).catch(() => none), wait(ANCHORS_BUDGET_MS, none)]) : none,
   ])
   for (const c of candidates) {
     if (!c.qid) continue

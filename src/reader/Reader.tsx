@@ -4,12 +4,13 @@ import {
 } from '../api/wikipedia'
 import { addVisit, setCurrent } from '../graph/history'
 import { articlePath, linkHandler, markVisitRecorded, navState } from '../router'
+import { useT } from '../i18n'
 import { getState, update } from '../state'
 import { cleanArticle, withCredits, type CleanArticle } from './cleanHtml'
 import { SuggestionList, useSuggestions } from './Suggestions'
 import { useReadingSignals } from './useReadingSignals'
 
-const LICENSE_URL = 'https://creativecommons.org/licenses/by-sa/4.0/deed.es'
+const LICENSE_URL = 'https://creativecommons.org/licenses/by-sa/4.0/'
 const HERO_WIDTH = 960 // a standard Wikimedia thumbnail step
 
 /** Records the visit once per history entry; going back to it just makes it current again. */
@@ -37,7 +38,7 @@ export function Reader({ title }: { title: string }) {
   const [page, setPage] = useState<{ summary: Summary; lead: CleanArticle; nodeId: string } | null>(null)
   const [full, setFull] = useState<CleanArticle | null>(null)
   const [loadingFull, setLoadingFull] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<'loadError' | 'loadFullError' | null>(null)
   const [credits, setCredits] = useState<Map<string, ImageCredit>>(new Map())
 
   const loadCredits = (files: string[]) => {
@@ -51,15 +52,16 @@ export function Reader({ title }: { title: string }) {
         if (cancelled) return
         const lead = cleanArticle(leadHtml)
         setPage({ summary, lead, nodeId: recordVisit(summary) })
-        document.title = `${summary.title} · Rabbit Hole`
+        document.title = `${summary.title}, rabbit hole`
         const hero = summary.originalimage && fileNameFromUrl(summary.originalimage.source)
         loadCredits([...(hero ? [hero] : []), ...lead.files])
       })
-      .catch(() => !cancelled && setError('No se ha podido cargar el artículo. Comprueba la conexión y vuelve a intentarlo.'))
+      .catch(() => !cancelled && setError('loadError'))
     return () => { cancelled = true }
   }, [title])
 
-  const cards = useSuggestions(page?.summary.title ?? title, page?.summary.wikibase_item ?? null, page?.nodeId ?? null)
+  const t = useT()
+  const cards = useSuggestions(title, page?.nodeId ?? null)
   const articleRef = useRef<HTMLElement>(null)
   const signals = useReadingSignals(page?.nodeId ?? null, page?.summary.wikibase_item ?? null, articleRef)
 
@@ -77,7 +79,7 @@ export function Reader({ title }: { title: string }) {
       setFull(article)
       loadCredits(article.files)
     } catch {
-      setError('No se ha podido cargar el artículo completo.')
+      setError('loadFullError')
     } finally {
       setLoadingFull(false)
     }
@@ -89,43 +91,47 @@ export function Reader({ title }: { title: string }) {
     if (a) linkHandler(articlePath(a.dataset.title!), { from: 'link' })(e)
   }
 
-  if (error && !page) return <main className="reader"><p className="error">{error}</p></main>
-  if (!page) return <main className="reader"><p className="muted">Cargando…</p></main>
-
-  const { summary } = page
-  const hero = heroImage(summary)
-  const heroCredit = summary.originalimage && credits.get(fileNameFromUrl(summary.originalimage.source) ?? '')
+  const summary = page?.summary
+  const hero = summary && heroImage(summary)
+  const heroCredit = summary?.originalimage && credits.get(fileNameFromUrl(summary.originalimage.source) ?? '')
 
   return (
-    <main className="reader">
-      <article ref={articleRef}>
-        <header>
-          <h1>{summary.title}</h1>
-          {summary.description && <p className="muted">{summary.description}</p>}
+    <main className="page reader">
+      {/* The title is known from the URL, so the page has its headline before any request returns. */}
+      <article ref={articleRef} lang="en">
+        <header className="article-head">
+          <h1 className="display">{summary?.title ?? title}</h1>
+          <p className="article-desc">{summary?.description ?? ' '}</p>
         </header>
+
+        {error && !page && <p className="error">{t(error)}</p>}
+        {!page && !error && <p className="sr-only">{t('loading')}</p>}
+
         {hero && (
-          <figure className="hero">
+          <figure className="frame hero">
             <img src={hero} alt="" />
             {heroCredit && (
-              <a className="credit" href={heroCredit.descriptionUrl} target="_blank" rel="noopener noreferrer">
-                {[heroCredit.artist, heroCredit.license].filter(Boolean).join(' · ')}
-              </a>
+              <figcaption>
+                <a className="credit" href={heroCredit.descriptionUrl} target="_blank" rel="noopener noreferrer">
+                  {[heroCredit.artist, heroCredit.license].filter(Boolean).join(', ')}
+                </a>
+              </figcaption>
             )}
           </figure>
         )}
-        <div className="prose" onClick={onTextClick} dangerouslySetInnerHTML={{ __html: intro }} />
+        {page && <div className="prose" onClick={onTextClick} dangerouslySetInnerHTML={{ __html: intro }} />}
 
         <SuggestionList cards={cards} />
 
-        {!full && (
-          <button className="read-more" onClick={openFull} disabled={loadingFull}>
-            {loadingFull ? 'Cargando…' : 'Leer artículo completo'}
+        {page && !full && (
+          <button className="button" onClick={openFull} disabled={loadingFull}>
+            {loadingFull ? t('loading') : t('readFull')}
           </button>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && page && <p className="error">{t(error)}</p>}
         {full && (
           <>
-            <div className="prose" onClick={onTextClick}>
+            <div className="prose sections" onClick={onTextClick}>
               {sections.map((s) => (
                 <details key={s.id || s.title} onToggle={(e) => e.currentTarget.open && signals.openedSection(s.title)}>
                   <summary>{s.title}</summary>
@@ -137,11 +143,13 @@ export function Reader({ title }: { title: string }) {
           </>
         )}
 
-        <footer className="attribution">
-          Texto de <a href={summary.content_urls.desktop.page} target="_blank" rel="noopener noreferrer">«{summary.title}» en Wikipedia</a>,
-          {' '}disponible bajo la licencia <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.
-          {' '}Las imágenes tienen su propio autor y licencia.
-        </footer>
+        {summary && (
+          <footer className="attribution">
+            {t('attrText')} <a href={summary.content_urls.desktop.page} target="_blank" rel="noopener noreferrer">{summary.title} {t('attrOnWikipedia')}</a>
+            {t('attrLicense')} <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.
+            {' '}{t('attrImages')}
+          </footer>
+        )}
       </article>
     </main>
   )

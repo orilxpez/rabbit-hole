@@ -1,6 +1,30 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { cleanArticle } from './cleanHtml'
+import { cleanArticle, excerpt } from './cleanHtml'
+
+describe('excerpt', () => {
+  it('keeps short sentences whole', () => {
+    expect(excerpt({ text: 'Built by Justinian.', start: 9, end: 18 })).toEqual({ before: 'Built by ', link: 'Justinian', after: '.' })
+  })
+
+  it('always shows the linked words of a long sentence', () => {
+    const text = 'x'.repeat(300) + ' Zenodotus ' + 'y'.repeat(300)
+    const e = excerpt({ text, start: 301, end: 310 }, 60)
+    expect(e.link).toBe('Zenodotus')
+    expect(e.before.startsWith('…')).toBe(true)
+    expect(e.after.endsWith('…')).toBe(true)
+    expect((e.before + e.link + e.after).length).toBeLessThanOrEqual(62)
+  })
+
+  it('cuts at word boundaries', () => {
+    const text = 'Among his contemporaries were Aratus, Apollonius of Rhodes and Theocritus, poets of the court in Alexandria.'
+    const start = text.indexOf('Apollonius')
+    const e = excerpt({ text, start, end: start + 'Apollonius of Rhodes'.length }, 60)
+    // Starts right after a space and ends right before one: no fragments like "…ith his".
+    expect(text).toContain(' ' + e.before.slice(1))
+    expect(text).toContain(e.after.slice(0, -1) + ' ')
+  })
+})
 
 const html = `
 <div class="mw-parser-output">
@@ -47,7 +71,9 @@ describe('cleanArticle', () => {
     expect(a.links.map((l) => [l.title, l.section])).toEqual([
       ['Istanbul', 0], ['Byzantine Empire', 0], ['Star Wars: A New Hope', 0], ['Justinian I', 1], ['Hagia Irene', 2],
     ])
-    expect(a.links[1].sentence).toBe('It was built by the Eastern Roman Empire in 537.')
+    const q = a.links[1].sentence!
+    expect(q.text).toBe('It was built by the Eastern Roman Empire in 537.')
+    expect(q.text.slice(q.start, q.end)).toBe('Eastern Roman Empire')
     expect(a.links[4]).toMatchObject({ sectionTitle: 'See also', sentence: null })
   })
 

@@ -30,7 +30,7 @@ describe('cachedFetch', () => {
     expect(localStorage.getItem('rh:cache:' + url)).toContain('"x"')
   })
 
-  it('never runs more than two requests at once', async () => {
+  it('never runs more than three requests at once', async () => {
     let running = 0
     let peak = 0
     vi.stubGlobal('fetch', vi.fn(async () => {
@@ -40,7 +40,7 @@ describe('cachedFetch', () => {
       return ok(1)
     }))
     await Promise.all(Array.from({ length: 6 }, () => cachedFetch(uniqueUrl(), { ttlMs: 1 })))
-    expect(peak).toBe(2)
+    expect(peak).toBe(3)
   })
 
   it('retries once after a 429', async () => {
