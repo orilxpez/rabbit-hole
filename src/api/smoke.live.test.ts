@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { memoryStorage } from '../test/memoryStorage'
 import { API_USER_AGENT } from './http'
-import { getHtml, getLinkingBack, getMoreLike, getPageInfo, getSummary } from './wikipedia'
+import { fileNameFromUrl, getArticleHtml, getImageCredits, getLinkingBack, getMoreLike, getPageInfo, getSummary } from './wikipedia'
 import { getTypes } from './wikidata'
 
 vi.stubGlobal('localStorage', memoryStorage())
@@ -13,7 +13,9 @@ vi.stubGlobal('fetch', (url: string, init: RequestInit) =>
 it('talks to the real APIs', async () => {
   const s = await getSummary('Hagia Sophia')
   expect(s.wikibase_item).toBe('Q12506')
-  expect((await getHtml('Hagia Sophia')).length).toBeGreaterThan(100_000)
+  expect(await getArticleHtml('Hagia Sophia', true)).toContain('href="/wiki/Byzantine_Empire"')
+  const credits = await getImageCredits([fileNameFromUrl(s.originalimage!.source)!])
+  console.log('credits', Object.fromEntries(credits))
   const titles = Array.from({ length: 60 }, (_, i) => `${1900 + i}`).concat(['Mercury', 'List_of_mosques', 'France'])
   const info = await getPageInfo(titles)
   console.log('pageInfo size', info.size, info.get('Mercury'), info.get('List_of_mosques'), info.get('1959')?.dailyViews)

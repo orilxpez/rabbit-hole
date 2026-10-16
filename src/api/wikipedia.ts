@@ -1,8 +1,6 @@
 import { DAY, cachedFetch, withParams } from './http'
 
 const REST = 'https://en.wikipedia.org/api/rest_v1'
-// Article HTML comes from the MediaWiki core REST API: RESTBase's page/html is being migrated here.
-const CORE_REST = 'https://en.wikipedia.org/w/rest.php/v1'
 const ACTION = 'https://en.wikipedia.org/w/api.php'
 const BATCH = 50 // Action API limit for titles per request
 
@@ -41,9 +39,63 @@ export function getSummary(title: string): Promise<Summary> {
   return cachedFetch(`${REST}/page/summary/${pathTitle(title)}`, { ttlMs: DAY })
 }
 
-/** Full Parsoid HTML. Too big for localStorage, so it is cached in memory only. */
-export function getHtml(title: string): Promise<string> {
-  return cachedFetch(`${CORE_REST}/page/${pathTitle(title)}/html`, { ttlMs: DAY, as: 'text' })
+/**
+ * Rendered article HTML. `leadOnly` fetches just the introduction (~50 KB, with its links:
+ * the REST summary has none). The full article (~1 MB) only fits in the memory cache.
+ */
+export async function getArticleHtml(title: string, leadOnly: boolean): Promise<string> {
+  const res = await action<{ parse?: { text: string } }>({
+    action: 'parse',
+    page: title,
+    prop: 'text',
+    ...(leadOnly ? { section: 0 } : {}),
+    redirects: 1,
+    disableeditsection: 1,
+    disablelimitreport: 1,
+  })
+  return res.parse?.text ?? ''
+}
+
+export interface ImageCredit {
+  artist: string
+  license: string
+  descriptionUrl: string
+}
+
+const stripTags = (html: string) => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+
+/** Author and license of Commons/local files, keyed by file name without the "File:" prefix. */
+export async function getImageCredits(fileNames: string[]): Promise<Map<string, ImageCredit>> {
+  const out = new Map<string, ImageCredit>()
+  for (const batch of chunk([...new Set(fileNames)], BATCH)) {
+    const res = await action<{ query?: { pages?: {
+      title: string
+      imageinfo?: { descriptionurl: string; extmetadata?: Record<string, { value: string }> }[]
+    }[] } }>({
+      prop: 'imageinfo',
+      iiprop: 'extmetadata|url',
+      iiextmetadatafilter: 'Artist|LicenseShortName',
+      titles: batch.map((f) => 'File:' + f).join('|'),
+    }, 30 * DAY)
+    for (const p of res.query?.pages ?? []) {
+      const info = p.imageinfo?.[0]
+      if (!info) continue
+      out.set(p.title.replace(/^File:/, ''), {
+        artist: stripTags(info.extmetadata?.Artist?.value ?? '') || 'Autor desconocido',
+        license: info.extmetadata?.LicenseShortName?.value ?? '',
+        descriptionUrl: info.descriptionurl,
+      })
+    }
+  }
+  return out
+}
+
+/** File name from an upload.wikimedia.org URL, thumbnail or original. */
+export function fileNameFromUrl(url: string): string | null {
+  const parts = new URL(url, 'https://upload.wikimedia.org').pathname.split('/')
+  const i = parts.indexOf('thumb')
+  const name = i >= 0 ? parts[i + 3] : parts.at(-1)
+  return name ? decodeURIComponent(name).replaceAll('_', ' ') : null
 }
 
 function action<T>(params: Record<string, string | number>, ttlMs = DAY): Promise<T> {
